@@ -31,38 +31,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "blob.h"
 
-
-
-#define MAX_PATH 1024
-typedef struct blob {
-	char path[MAX_PATH];
-	char *data;
-	size_t size;
-} Blob;
-
-static Blob tbl [100];
-static int totalBlobs = 0;
-
-Blob *getEntry(char *path) {
-	fprintf(stderr, "this is the path in entry %s", path);
-	for(int i = 0; i < totalBlobs; i++) {
-		if (strcmp(tbl[i].path, path) == 0) {
-			return &tbl[i];
-		}
-	}
-
-	return NULL;
-}
-
-
-/*
- * Command line options
- *
- * We can't set default values for the char* fields here because
- * fuse_opt_parse would attempt to free() them when the user specifies
- * different values on the command line.
- */
 static struct options {
 	const char *filename;
 	const char *contents;
@@ -149,8 +119,6 @@ static int hello_read(const char *path, char *buf, size_t size, off_t offset,
 	if (b == NULL)  {
 		return -ENOENT;
 	}
-	fprintf(stderr, "the path in read is %s", b->path);
-	fprintf(stderr, "the value in read is %s", b->data);
 	
 	memcpy(buf, b -> data, b -> size);
 	return b -> size;
@@ -179,16 +147,10 @@ static int hello_write(const char *path, const char *buf, size_t size,
 
 
 static int hello_create(const char *path, mode_t mode, struct fuse_file_info *fi) {
-	fprintf(stderr, "%s %s ", "the path for create is", path);
-
 	Blob *b = &tbl[totalBlobs];
 	totalBlobs++;
 	strcpy(b -> path, path);
-
-	fprintf(stderr, "%s %s", "the path for create is", b -> path);
-
 	b->size = 0;
-	
 	return 0;
 }
 
