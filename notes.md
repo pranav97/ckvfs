@@ -12,6 +12,14 @@ Main data structures in this file system are
         Data - A string version of a list of files and dirs in the TreeBlob.
 
 Writing TreeBlob to disk - 
+```
+struct TreeBlob {
+        char *names[];
+        char *
+
+}
+
+```
 1. On creating the dir we would create an empty treeblob with no data
 2. Once it is a directory, it has to be 
     a. Loaded from disk

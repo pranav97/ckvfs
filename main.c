@@ -31,7 +31,40 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "blob.h"
+// #include "blob.h"
+
+// these need to be refactored
+#include <stdio.h>
+#include <string.h>
+
+
+#define MAX_PATH 100
+
+#define MAX_KEY 1024
+
+typedef struct blob {
+	char path[MAX_KEY];
+	char *data;
+	size_t size;
+} Blob;
+
+#define NUM_BLOBS
+
+
+static Blob tbl [NUM_BLOBS];
+static char all_paths[NUM_BLOBS][MAX_PATH];
+static int totalBlobs = 0;
+Blob *getEntry(const char *path) {
+	fprintf(stderr, "this is the path in entry %s", path);
+	for(int i = 0; i < totalBlobs; i++) {
+		if (strcmp(tbl[i].path, path) == 0) {
+			return &tbl[i];
+		}
+	}
+	return NULL;
+}
+
+
 
 static struct options {
 	const char *filename;
@@ -136,6 +169,8 @@ static int hello_write(const char *path, const char *buf, size_t size,
 	Blob *b = getEntry(path);
 	if (b == NULL)  {
 		b = &tbl[totalBlobs];
+		strcpy(all_paths[totalBlobs], path);
+		fprintf(stderr, "the path that was saved in totalBlobs is %s", all_paths[totalBlobs]);
 		totalBlobs++;
 	}
 	b->data = malloc(size);
@@ -147,12 +182,20 @@ static int hello_write(const char *path, const char *buf, size_t size,
 
 
 static int hello_create(const char *path, mode_t mode, struct fuse_file_info *fi) {
+	// todo check permissions from mode
 	Blob *b = &tbl[totalBlobs];
 	totalBlobs++;
 	strcpy(b -> path, path);
 	b->size = 0;
 	return 0;
 }
+
+// struct TreeBlob 
+// static int hello_mkdir(const char *name, mode_t mode) {
+// 	// todo check permissions from mode
+
+
+// }
 
 
 
@@ -164,6 +207,7 @@ static const struct fuse_operations hello_oper = {
 	.read		= hello_read,
 	.write		= hello_write,
 	.create 	= hello_create,
+	// .mkdir		= hello_mkdir,
 };
 
 static void show_help(const char *progname)
