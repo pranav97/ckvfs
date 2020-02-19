@@ -57,7 +57,19 @@ static const struct fuse_opt option_spec[] = {
 	FUSE_OPT_END
 };
 
-int *getPath(const char *path) {
+void get_sha_from_path(const char *path, char *sha) {
+	for(int i = 0; i < totalPaths; i++) {
+		if (strcmp(all_paths[i], path) == 0) {
+			fprintf(stderr, "\nsha %s\n", all_shas[i]);
+			fprintf(stderr, "path is %s\n", path);
+			strcpy(sha, all_shas[i]);
+			return;
+		}
+	}
+	strcpy(sha, "");
+}
+
+int *get_path(const char *path) {
 	for(int i = 0; i < totalPaths; i++) {
 		if (strcmp(all_paths[i], path) == 0) {
 			return 0;
@@ -66,9 +78,9 @@ int *getPath(const char *path) {
 	return 1;
 }
 
-Blob *getEntry(const char *path) {
+Blob *get_blob(const char *path) {
 	for(int i = 0; i < totalBlobs; i++) {
-		if (strcmp(tbl[i].path, path) == 0) {
+		if (strcmp(tbl[i].sha, path) == 0) {
 			return &tbl[i];
 		}
 	}
@@ -81,7 +93,7 @@ void printTBL() {
 	for(int i = 0; i < totalBlobs; i++) {
 		Blob *tblob = &tbl[i];
 		fprintf(stderr, "sha %s\n", all_shas[i]);
-		fprintf(stderr, "key %s\n", tblob -> path);
+		fprintf(stderr, "key %s\n", tblob -> sha);
 		fprintf(stderr, "val %s\n", tblob -> data);
 	}
 
@@ -105,6 +117,8 @@ static int hello_getattr(const char *path, struct stat *stbuf,
 {
 	(void) fi;
 	int res = 0;
+	char sha[MAX_SHA];
+
 
 	memset(stbuf, 0, sizeof(struct stat));
 	if (strcmp(path, "/") == 0) {
@@ -113,7 +127,7 @@ static int hello_getattr(const char *path, struct stat *stbuf,
 		return res;
 	}
 	// char *strip_path = strip(path);
-	int contains = getPath(path);
+	int contains = get_path(path);
 	if (contains == 1) {
 		return -ENOENT;
 	}
@@ -121,11 +135,14 @@ static int hello_getattr(const char *path, struct stat *stbuf,
 
 	stbuf->st_mode = S_IFREG | 0444;
 	stbuf->st_nlink = 1;
-	Blob * b = getEntry(path);
-	if (b == NULL) {
+
+	get_sha_from_path(path, &sha[0]);
+
+	if (strcmp(sha, "") == 0) {
 		stbuf->st_size = 0;
 	}
 	else {
+		Blob *b = get_blob(sha);
 		stbuf->st_size = b -> size;
 	}
 
@@ -162,12 +179,22 @@ static int hello_read(const char *path, char *buf, size_t size, off_t offset,
 		      struct fuse_file_info *fi)
 {
 	(void) fi;
-	Blob *b = getEntry(path);
-	if (b == NULL)  {
+	char sha[MAX_SHA];
+	get_sha_from_path(path, &sha[0]);
+	fprintf(stderr, "Sha from read => %s\n", sha);
+
+	if (strcmp(sha, "") == 0)  {
 		return -ENOENT;
 	}
 	
+	Blob *b = get_blob(sha);
+	if (b == NULL)  {
+		return -ENOENT;
+	}
+	fprintf(stderr, "file contents read => %s\n", b -> data);
 	memcpy(buf, b -> data, b -> size);
+	fprintf(stderr, "buf => %s\n", buf);
+	fprintf(stderr, "size => %d\n", b -> size);
 	return b -> size;
 }
 
@@ -188,12 +215,13 @@ static int hello_write(const char *path, const char *buf, size_t size,
 	strcat(sha_data, path);
 	sha256_string(sha_data, all_shas[totalBlobs]);
 
-	Blob *b = getEntry(path);
+	Blob *b = get_blob(path);
 	b = &tbl[totalBlobs];
-	totalBlobs++;
 	b->data = malloc(size);
 	memcpy(b -> data, buf, size);
-	strcpy(b -> path, path);
+	strcpy(b -> sha, all_shas[totalBlobs]);
+	totalBlobs++;
+	
 	b->size = size;
 	printTBL();
 	return size;
@@ -205,7 +233,7 @@ static int hello_create(const char *path, mode_t mode, struct fuse_file_info *fi
 	// strcpy(all_paths[totalBlobs], path);
 	// strcpy(all_shas[totalBlobs], "");
 	// totalBlobs++;
-	int contains = getPath(path);
+	int contains = get_path(path);
 	if (contains == 1) {
 		strcpy(all_paths[totalPaths++], path);
 	}

@@ -15,10 +15,10 @@
 
 #define MAX_SHA 100
 
-#define MAX_BLOCK 4096
+#define MAX_BLOCK 1000
 
 typedef struct blob {
-	char path[MAX_PATH];
+	char sha[MAX_PATH];
 	char *data;
 	size_t size;
 } Blob;
