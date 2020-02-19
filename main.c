@@ -67,7 +67,6 @@ int *getPath(const char *path) {
 }
 
 Blob *getEntry(const char *path) {
-	fprintf(stderr, "this is the path in entry %s", path);
 	for(int i = 0; i < totalBlobs; i++) {
 		if (strcmp(tbl[i].path, path) == 0) {
 			return &tbl[i];
@@ -96,7 +95,6 @@ void printTBL() {
 static void *hello_init(struct fuse_conn_info *conn,
 			struct fuse_config *cfg)
 {
-	fprintf(stderr, "%s", "init called ");
 	(void) conn;
 	cfg->kernel_cache = 1;
 	return NULL;
@@ -107,7 +105,6 @@ static int hello_getattr(const char *path, struct stat *stbuf,
 {
 	(void) fi;
 	int res = 0;
-	// fprintf(stderr, "path in getattr %s", path);
 
 	memset(stbuf, 0, sizeof(struct stat));
 	if (strcmp(path, "/") == 0) {
@@ -117,7 +114,6 @@ static int hello_getattr(const char *path, struct stat *stbuf,
 	}
 	// char *strip_path = strip(path);
 	int contains = getPath(path);
-	fprintf(stderr, "\ngetPath returned %d\n", contains);
 	if (contains == 1) {
 		return -ENOENT;
 	}
@@ -185,13 +181,12 @@ static int hello_write(const char *path, const char *buf, size_t size,
 	
 	char sha_data[MAX_BLOCK] = "";
 	if ((strlen(buf) + strlen(path)) > MAX_BLOCK) {
-		// sound the alarms, the sky is falling!!!!!
-		return 0; // todo - find a way to split the data and put it back together. 
+		 // todo - find a way to split the data and put it back together. 
+		return 0;
 	}
 	strcat(sha_data, buf);
 	strcat(sha_data, path);
 	sha256_string(sha_data, all_shas[totalBlobs]);
-	fprintf(stderr, "\nsha => %s\n", all_shas[totalBlobs]);
 
 	Blob *b = getEntry(path);
 	b = &tbl[totalBlobs];

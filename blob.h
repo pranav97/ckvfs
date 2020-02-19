@@ -7,7 +7,9 @@
 
 #define MAX_PATH 100
 
-#define MAX_KEY 1024
+// todo find out what this should be
+#define MAX_KEY 101
+
 
 #define NUM_BLOBS 100
 
