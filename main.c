@@ -30,8 +30,16 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+#include "blob.h"
 
 #include "blob.h"
+#include "checksum.c"
+
+static Blob tbl [100];
+static char all_paths[NUM_BLOBS][MAX_PATH];
+static char all_shas[NUM_BLOBS][MAX_SHA];
+static int totalBlobs = 0;
+static int totalPaths = 0;
 
 static struct options {
 	const char *filename;
@@ -48,6 +56,42 @@ static const struct fuse_opt option_spec[] = {
 	OPTION("--help", show_help),
 	FUSE_OPT_END
 };
+
+int *getPath(const char *path) {
+	for(int i = 0; i < totalPaths; i++) {
+		if (strcmp(all_paths[i], path) == 0) {
+			return 0;
+		}
+	}
+	return 1;
+}
+
+Blob *getEntry(const char *path) {
+	fprintf(stderr, "this is the path in entry %s", path);
+	for(int i = 0; i < totalBlobs; i++) {
+		if (strcmp(tbl[i].path, path) == 0) {
+			return &tbl[i];
+		}
+	}
+
+	return NULL;
+}
+
+void printTBL() {
+	fprintf(stderr, "\nThe tbl is: \n");
+	for(int i = 0; i < totalBlobs; i++) {
+		Blob *tblob = &tbl[i];
+		fprintf(stderr, "sha %s\n", all_shas[i]);
+		fprintf(stderr, "key %s\n", tblob -> path);
+		fprintf(stderr, "val %s\n", tblob -> data);
+	}
+
+	fprintf(stderr, "\nThe paths are: \n");
+	for(int i = 0; i < totalPaths; i++)
+		fprintf(stderr, "path %s\n", all_paths[i]);
+
+}
+
 
 static void *hello_init(struct fuse_conn_info *conn,
 			struct fuse_config *cfg)
@@ -72,15 +116,22 @@ static int hello_getattr(const char *path, struct stat *stbuf,
 		return res;
 	}
 	// char *strip_path = strip(path);
-	Blob * b = getEntry(path);
-	fprintf(stderr, " %s %s", "path for b is ", b -> path);
-	if (b == NULL) {
+	int contains = getPath(path);
+	fprintf(stderr, "\ngetPath returned %d\n", contains);
+	if (contains == 1) {
 		return -ENOENT;
 	}
+	
 
 	stbuf->st_mode = S_IFREG | 0444;
 	stbuf->st_nlink = 1;
-	stbuf->st_size = b -> size;
+	Blob * b = getEntry(path);
+	if (b == NULL) {
+		stbuf->st_size = 0;
+	}
+	else {
+		stbuf->st_size = b -> size;
+	}
 
 	return res;
 }
@@ -132,25 +183,41 @@ static int hello_write(const char *path, const char *buf, size_t size,
 	(void) offset;
 	(void) fi;
 	
-	
-	Blob *b = getEntry(path);
-	if (b == NULL)  {
-		b = &tbl[totalBlobs];
-		totalBlobs++;
+	char sha_data[MAX_BLOCK] = "";
+	if ((strlen(buf) + strlen(path)) > MAX_BLOCK) {
+		// sound the alarms, the sky is falling!!!!!
+		return 0; // todo - find a way to split the data and put it back together. 
 	}
+	strcat(sha_data, buf);
+	strcat(sha_data, path);
+	sha256_string(sha_data, all_shas[totalBlobs]);
+	fprintf(stderr, "\nsha => %s\n", all_shas[totalBlobs]);
+
+	Blob *b = getEntry(path);
+	b = &tbl[totalBlobs];
+	totalBlobs++;
 	b->data = malloc(size);
 	memcpy(b -> data, buf, size);
 	strcpy(b -> path, path);
 	b->size = size;
+	printTBL();
 	return size;
 }
 
 
 static int hello_create(const char *path, mode_t mode, struct fuse_file_info *fi) {
-	Blob *b = &tbl[totalBlobs];
-	totalBlobs++;
-	strcpy(b -> path, path);
-	b->size = 0;
+	// Blob *b = &tbl[totalBlobs];
+	// strcpy(all_paths[totalBlobs], path);
+	// strcpy(all_shas[totalBlobs], "");
+	// totalBlobs++;
+	int contains = getPath(path);
+	if (contains == 1) {
+		strcpy(all_paths[totalPaths++], path);
+	}
+
+	// strcpy(b -> path, path);
+	// b->size = 0;
+	printTBL();
 	return 0;
 }
 
