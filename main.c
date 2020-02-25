@@ -33,11 +33,15 @@
 #include "blob.h"
 
 #include "blob.h"
-#include "checksum.c"
+#include "rand.c"
+// #include "checksum.c"
 
-static Blob tbl [100];
+
+static Blob tbl [100]; 
+
+
 static char all_paths[NUM_BLOBS][MAX_PATH];
-static char all_shas[NUM_BLOBS][MAX_SHA];
+static char all_rand[NUM_BLOBS][MAX_INODEID];
 static int totalBlobs = 0;
 static int totalPaths = 0;
 
@@ -57,19 +61,19 @@ static const struct fuse_opt option_spec[] = {
 	FUSE_OPT_END
 };
 
-void get_sha_from_path(const char *path, char *sha) {
+void get_inode_from_path(const char *path, char *rand) {
 	for(int i = 0; i < totalPaths; i++) {
 		if (strcmp(all_paths[i], path) == 0) {
-			fprintf(stderr, "\nsha %s\n", all_shas[i]);
+			fprintf(stderr, "\nrand %s\n", all_rand[i]);
 			fprintf(stderr, "path is %s\n", path);
-			strcpy(sha, all_shas[i]);
+			strcpy(rand, all_rand[i]);
 			return;
 		}
 	}
-	strcpy(sha, "");
+	strcpy(rand, "");
 }
 
-int *get_path(const char *path) {
+int get_path(const char *path) {
 	for(int i = 0; i < totalPaths; i++) {
 		if (strcmp(all_paths[i], path) == 0) {
 			return 0;
@@ -80,7 +84,7 @@ int *get_path(const char *path) {
 
 Blob *get_blob(const char *path) {
 	for(int i = 0; i < totalBlobs; i++) {
-		if (strcmp(tbl[i].sha, path) == 0) {
+		if (strcmp(tbl[i].inodeid, path) == 0) {
 			return &tbl[i];
 		}
 	}
@@ -92,8 +96,8 @@ void printTBL() {
 	fprintf(stderr, "\nThe tbl is: \n");
 	for(int i = 0; i < totalBlobs; i++) {
 		Blob *tblob = &tbl[i];
-		fprintf(stderr, "sha %s\n", all_shas[i]);
-		fprintf(stderr, "key %s\n", tblob -> sha);
+		fprintf(stderr, "rand %s\n", all_rand[i]);
+		fprintf(stderr, "key %s\n", tblob -> inodeid);
 		fprintf(stderr, "val %s\n", tblob -> data);
 	}
 
@@ -109,6 +113,9 @@ static void *hello_init(struct fuse_conn_info *conn,
 {
 	(void) conn;
 	cfg->kernel_cache = 1;
+	// put in random seed every time that the file system comes up.
+	put_time_srand_seed(); 
+
 	return NULL;
 }
 
@@ -117,7 +124,7 @@ static int hello_getattr(const char *path, struct stat *stbuf,
 {
 	(void) fi;
 	int res = 0;
-	char sha[MAX_SHA];
+	char rand[MAX_INODEID];
 
 
 	memset(stbuf, 0, sizeof(struct stat));
@@ -136,13 +143,13 @@ static int hello_getattr(const char *path, struct stat *stbuf,
 	stbuf->st_mode = S_IFREG | 0444;
 	stbuf->st_nlink = 1;
 
-	get_sha_from_path(path, &sha[0]);
+	get_inode_from_path(path, &rand[0]);
 
-	if (strcmp(sha, "") == 0) {
+	if (strcmp(rand, "") == 0) {
 		stbuf->st_size = 0;
 	}
 	else {
-		Blob *b = get_blob(sha);
+		Blob *b = get_blob(rand);
 		stbuf->st_size = b -> size;
 	}
 
@@ -179,22 +186,22 @@ static int hello_read(const char *path, char *buf, size_t size, off_t offset,
 		      struct fuse_file_info *fi)
 {
 	(void) fi;
-	char sha[MAX_SHA];
-	get_sha_from_path(path, &sha[0]);
-	fprintf(stderr, "Sha from read => %s\n", sha);
+	char rand[MAX_INODEID];
+	get_inode_from_path(path, &rand[0]);
+	fprintf(stderr, "rand from read => %s\n", rand);
 
-	if (strcmp(sha, "") == 0)  {
+	if (strcmp(rand, "") == 0)  {
 		return -ENOENT;
 	}
 	
-	Blob *b = get_blob(sha);
+	Blob *b = get_blob(rand);
 	if (b == NULL)  {
 		return -ENOENT;
 	}
 	fprintf(stderr, "file contents read => %s\n", b -> data);
 	memcpy(buf, b -> data, b -> size);
 	fprintf(stderr, "buf => %s\n", buf);
-	fprintf(stderr, "size => %d\n", b -> size);
+	fprintf(stderr, "size => %ld\n", b -> size);
 	return b -> size;
 }
 
@@ -206,20 +213,20 @@ static int hello_write(const char *path, const char *buf, size_t size,
 	(void) offset;
 	(void) fi;
 	
-	char sha_data[MAX_BLOCK] = "";
+	char data[MAX_BLOCK] = "";
 	if ((strlen(buf) + strlen(path)) > MAX_BLOCK) {
 		 // todo - find a way to split the data and put it back together. 
 		return 0;
 	}
-	strcat(sha_data, buf);
-	strcat(sha_data, path);
-	sha256_string(sha_data, all_shas[totalBlobs]);
+	strcat(data, buf);
+	strcat(data, path);
+	get_random_num(all_rand[totalBlobs]);
 
 	Blob *b = get_blob(path);
 	b = &tbl[totalBlobs];
 	b->data = malloc(size);
 	memcpy(b -> data, buf, size);
-	strcpy(b -> sha, all_shas[totalBlobs]);
+	strcpy(b -> inodeid, all_rand[totalBlobs]);
 	totalBlobs++;
 	
 	b->size = size;
@@ -231,7 +238,7 @@ static int hello_write(const char *path, const char *buf, size_t size,
 static int hello_create(const char *path, mode_t mode, struct fuse_file_info *fi) {
 	// Blob *b = &tbl[totalBlobs];
 	// strcpy(all_paths[totalBlobs], path);
-	// strcpy(all_shas[totalBlobs], "");
+	// strcpy(all_rand[totalBlobs], "");
 	// totalBlobs++;
 	int contains = get_path(path);
 	if (contains == 1) {
