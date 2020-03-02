@@ -31,19 +31,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include "blob.h"
+#include "rand.h"
+#include "dict.h"
 
-#include "blob.h"
-#include "rand.c"
-// #include "checksum.c"
-
-
-static Blob tbl [100]; 
-
-
-static char all_paths[NUM_BLOBS][MAX_PATH];
-static char all_rand[NUM_BLOBS][MAX_INODEID];
-static int totalBlobs = 0;
-static int totalPaths = 0;
 
 static struct options {
 	const char *filename;
@@ -61,52 +51,6 @@ static const struct fuse_opt option_spec[] = {
 	FUSE_OPT_END
 };
 
-void get_inode_from_path(const char *path, char *rand) {
-	for(int i = 0; i < totalPaths; i++) {
-		if (strcmp(all_paths[i], path) == 0) {
-			fprintf(stderr, "\nrand %s\n", all_rand[i]);
-			fprintf(stderr, "path is %s\n", path);
-			strcpy(rand, all_rand[i]);
-			return;
-		}
-	}
-	strcpy(rand, "");
-}
-
-int get_path(const char *path) {
-	for(int i = 0; i < totalPaths; i++) {
-		if (strcmp(all_paths[i], path) == 0) {
-			return 0;
-		}
-	}
-	return 1;
-}
-
-Blob *get_blob(const char *path) {
-	for(int i = 0; i < totalBlobs; i++) {
-		if (strcmp(tbl[i].inodeid, path) == 0) {
-			return &tbl[i];
-		}
-	}
-
-	return NULL;
-}
-
-void printTBL() {
-	fprintf(stderr, "\nThe tbl is: \n");
-	for(int i = 0; i < totalBlobs; i++) {
-		Blob *tblob = &tbl[i];
-		fprintf(stderr, "rand %s\n", all_rand[i]);
-		fprintf(stderr, "key %s\n", tblob -> inodeid);
-		fprintf(stderr, "val %s\n", tblob -> data);
-	}
-
-	fprintf(stderr, "\nThe paths are: \n");
-	for(int i = 0; i < totalPaths; i++)
-		fprintf(stderr, "path %s\n", all_paths[i]);
-
-}
-
 
 static void *hello_init(struct fuse_conn_info *conn,
 			struct fuse_config *cfg)
@@ -114,8 +58,14 @@ static void *hello_init(struct fuse_conn_info *conn,
 	(void) conn;
 	cfg->kernel_cache = 1;
 	// put in random seed every time that the file system comes up.
-	put_time_srand_seed(); 
+	set_time_srand_seed(); 
 
+	Blob *root = malloc(sizeof(Blob));
+	const char root_inode[MAX_INODEID] = "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002";
+	strcpy(root -> inodeid, root_inode);
+	root -> is_dir = true;
+	root -> num_items = 0;
+	write_to_dict(root -> inodeid, root);
 	return NULL;
 }
 
@@ -125,31 +75,26 @@ static int hello_getattr(const char *path, struct stat *stbuf,
 	(void) fi;
 	int res = 0;
 	char rand[MAX_INODEID];
-
-
 	memset(stbuf, 0, sizeof(struct stat));
+
 	if (strcmp(path, "/") == 0) {
 		stbuf->st_mode = S_IFDIR | 0755;
 		stbuf->st_nlink = 2;
 		return res;
 	}
-	// char *strip_path = strip(path);
-	int contains = get_path(path);
-	if (contains == 1) {
-		return -ENOENT;
-	}
-	
-
-	stbuf->st_mode = S_IFREG | 0444;
-	stbuf->st_nlink = 1;
-
-	get_inode_from_path(path, &rand[0]);
-
-	if (strcmp(rand, "") == 0) {
-		stbuf->st_size = 0;
-	}
 	else {
-		Blob *b = get_blob(rand);
+		Blob *root = get_root_inode();	
+		int contains = has_path(root, path);
+		fprintf(stderr, "contains is %d", contains);
+		if (contains == 1) {
+			return -ENOENT;
+		}
+		stbuf->st_mode = S_IFREG | 0444;
+		stbuf->st_nlink = 1;
+
+		Blob *target_blob = tbl[0];
+		get_inode_from_path(target_blob, path, &rand[0]);
+		Blob *b = get_blob_from_key(rand);
 		stbuf->st_size = b -> size;
 	}
 
@@ -187,14 +132,16 @@ static int hello_read(const char *path, char *buf, size_t size, off_t offset,
 {
 	(void) fi;
 	char rand[MAX_INODEID];
-	get_inode_from_path(path, &rand[0]);
+	Blob *root = get_root_inode();	
+
+	// todo: iterate though the inodes to find the right one 
+	get_inode_from_path(root, path, rand);
 	fprintf(stderr, "rand from read => %s\n", rand);
 
 	if (strcmp(rand, "") == 0)  {
 		return -ENOENT;
 	}
-	
-	Blob *b = get_blob(rand);
+	Blob *b = get_blob_from_key(rand);
 	if (b == NULL)  {
 		return -ENOENT;
 	}
@@ -213,22 +160,24 @@ static int hello_write(const char *path, const char *buf, size_t size,
 	(void) offset;
 	(void) fi;
 	
+	fprintf(stderr, "write \n");
 	char data[MAX_BLOCK] = "";
 	if ((strlen(buf) + strlen(path)) > MAX_BLOCK) {
 		 // todo - find a way to split the data and put it back together. 
 		return 0;
 	}
 	strcat(data, buf);
-	strcat(data, path);
-	get_random_num(all_rand[totalBlobs]);
-
-	Blob *b = get_blob(path);
-	b = &tbl[totalBlobs];
-	b->data = malloc(size);
-	memcpy(b -> data, buf, size);
-	strcpy(b -> inodeid, all_rand[totalBlobs]);
-	totalBlobs++;
+	char found_rand[MAX_INODEID];
+	Blob *root = get_root_inode();
+	get_inode_from_path(root, path, found_rand);
+	fprintf(stderr, "the inode id is %s \n", found_rand);
 	
+	Blob *b = get_blob_from_key(found_rand);
+	fprintf(stderr, "The new blob is %s\n", b -> inodeid);
+	memcpy(b -> data, buf, size);
+	fprintf(stderr, "memcopied the data\n");
+	fprintf(stderr, "data is %s\n", b -> data);
+	fprintf(stderr, "%s\n", b -> data);
 	b->size = size;
 	printTBL();
 	return size;
@@ -236,18 +185,30 @@ static int hello_write(const char *path, const char *buf, size_t size,
 
 
 static int hello_create(const char *path, mode_t mode, struct fuse_file_info *fi) {
-	// Blob *b = &tbl[totalBlobs];
-	// strcpy(all_paths[totalBlobs], path);
-	// strcpy(all_rand[totalBlobs], "");
-	// totalBlobs++;
-	int contains = get_path(path);
-	if (contains == 1) {
-		strcpy(all_paths[totalPaths++], path);
-	}
+	// todo make this go ahead and get all the nodes down the tree
 
-	// strcpy(b -> path, path);
-	// b->size = 0;
-	printTBL();
+	Blob *root = get_root_inode();
+	int contains = has_path(root, path);
+	if (contains == 1) {
+		insert_item_into_blob(root, path);
+		fprintf(stderr, "num_items %d\n", root -> num_items);
+		fprintf(stderr, "path is %s\n",root -> sub_items[0] -> item_path);
+		fprintf(stderr, "inode id %s\n", root -> sub_items[0] -> inodeid);
+		fprintf(stderr, "isdir %d\n", root -> sub_items[0] -> is_dir);
+
+		char inodeid[MAX_INODEID];
+		get_inode_from_path(root, path, inodeid);
+		Blob *new_blob = (Blob *) malloc(sizeof(Blob));
+        new_blob -> num_items = 0;
+        strcpy(new_blob -> inodeid, inodeid);
+        char * new_bl = malloc(MAX_BLOCK * sizeof(char));
+        strcpy(new_bl, "");
+		new_blob -> data = new_bl;
+        new_blob -> size = 0;
+		tbl[totalBlobs] = new_blob;
+		strcpy(keys[totalBlobs], inodeid);
+        totalBlobs ++;
+	}
 	return 0;
 }
 

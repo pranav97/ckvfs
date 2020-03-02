@@ -1,23 +1,17 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
-#include <string.h>
-# define DECIMAL  10
-# define HEX 16
-# define OCTAL 8
+#include "rand.h"
 
 
- /* reverse:  reverse string s in place */
- void reverse(char s[])
- {
-     int i, j;
-     char c;
+/* reverse:  reverse string s in place */
+void reverse(char s[])
+{
+    int i, j;
+    char c;
 
-     for (i = 0, j = strlen(s)-1; i<j; i++, j--) {
-         c = s[i];
-         s[i] = s[j];
-         s[j] = c;
-     }
+    for (i = 0, j = strlen(s)-1; i<j; i++, j--) {
+        c = s[i];
+        s[i] = s[j];
+        s[j] = c;
+    }
 }
 /* itoa:  convert n to characters in s 
 from Kernighan and Ritchie's The C Programming */ 
@@ -47,7 +41,7 @@ void itoa(unsigned int n, char s[], int offset)
 
 void get_random_num(char *buffer) {
     strcpy(buffer, "");
-    unsigned int i, j, t;
+    unsigned int i, t;
     char ret [150];
     strcpy(ret, "");
 
@@ -63,25 +57,25 @@ void get_random_num(char *buffer) {
     buffer[i] = 0;
 }
 
-void put_time_srand_seed() {
+void set_time_srand_seed() {
     time_t t;
     srand((unsigned) time(&t));
 }
 
-void get_random_numbers() {
+// void get_random_numbers() {
     
-    int i, n;
-    n = 5;
-    char buffer [97];
-    put_time_srand_seed();
+//     int i, n;
+//     n = 5;
+//     char buffer [97];
+//     set_time_srand_seed();
     
    
-   /* Print 5 random numbers from 0 to 50 */
-   for( i = 0 ; i < n ; i++ ) {
-        get_random_num(buffer);
-        printf("%s\t %ld\n",buffer, strlen(buffer));
-   }
-}
+//    /* Print 5 random numbers from 0 to 50 */
+//    for( i = 0 ; i < n ; i++ ) {
+//         get_random_num(buffer);
+//         printf("%s\t %ld\n",buffer, strlen(buffer));
+//    }
+// }
 
 // int main () {
 //    get_random_numbers();
