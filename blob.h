@@ -38,7 +38,7 @@ extern void print_paths(Blob *b);
 	
 extern int has_path(Blob *b, const char *path);
 
-extern void insert_item_into_blob(Blob *b, const char *name);
+extern void insert_item_into_blob(Blob *b, const char *name, bool is_dir);
 
 extern void get_inode_from_path(Blob *b, const char *path, char *rand);
 

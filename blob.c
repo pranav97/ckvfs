@@ -22,7 +22,7 @@ int has_path(Blob *b, const char *path) {
 	return 1;
 }
 
-void insert_item_into_blob(Blob *b, const char *name) {
+void insert_item_into_blob(Blob *b, const char *name, bool is_dir) {
     // todo take in information about whether a dir or not 
     if (has_path(b, name) == 0) {
         return;
@@ -40,6 +40,7 @@ void insert_item_into_blob(Blob *b, const char *name) {
         Item *new_item = (Item *) malloc(sizeof(Item));
         new_item -> item_path = new_name;
         new_item -> inodeid = new_inodeid;
+        new_item -> is_dir = is_dir;
         
         b -> sub_items[b -> num_items] = new_item;
         b -> num_items ++;

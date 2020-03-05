@@ -165,23 +165,25 @@ static int hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		get_list(root, buf, filler); 
 		return 0;
 	}
-	// get_inode_from_path(root, path, rand);
+	else {
+		/* all this doesn't matter till you get makedir to work */   
+		get_inode_from_path(root, path, rand);
 
-	// if (strcmp(rand, "") == 0)  {
-	// /* cant find the root node this is a problem */
-	// 	fprintf(stderr, "NOT FOUND\n");
+		if (strcmp(rand, "") == 0)  {
+		/* cant find the root node this is a problem */
+			fprintf(stderr, "NOT FOUND\n");
 
-	// 	return -ENOENT;
-	// }
-	// Blob *b = get_blob_from_key(rand);
-	// if (b == NULL) {
-	// 	/* cant find the node that they are looking for in the table of keys and their values */
-	// 	return -ENOENT;
-	// }
-	// if (b ->  is_dir == false) {
-	// 	return -ENOTDIR;
-	// }
-
+			return -ENOENT;
+		}
+		Blob *b = get_blob_from_key(rand);
+		if (b == NULL) {
+			/* cant find the node that they are looking for in the table of keys and their values */
+			return -ENOENT;
+		}
+		if (b ->  is_dir == false) {
+			return -ENOTDIR;
+		}
+	}
 	return retstat;
 }
 
@@ -250,7 +252,7 @@ static int hello_create(const char *path, mode_t mode, struct fuse_file_info *fi
 	Blob *root = get_root_inode();
 	int contains = has_path(root, path);
 	if (contains == 1) {
-		insert_item_into_blob(root, path);
+		insert_item_into_blob(root, path, false);
 		fprintf(stderr, "num_items %d\n", root -> num_items);
 		fprintf(stderr, "path is %s\n",root -> sub_items[0] -> item_path);
 		fprintf(stderr, "inode id %s\n", root -> sub_items[0] -> inodeid);
