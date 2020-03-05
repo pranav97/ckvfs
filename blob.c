@@ -7,7 +7,7 @@ void print_paths(Blob *b) {
     for(int i = 0; i < b -> num_items; i++)
         fprintf(stderr, "path %s\n", b -> sub_items[i] -> item_path);
 }
-	
+
 int has_path(Blob *b, const char *path) {
 	// todo - this funciton should be recursive, looking at even the dirs
 	// that are in here as opposed to just the files

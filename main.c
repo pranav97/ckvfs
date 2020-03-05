@@ -105,18 +105,78 @@ static int hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 			 off_t offset, struct fuse_file_info *fi,
 			 enum fuse_readdir_flags flags)
 {
+  /*
+    filler()'s prototype looks like this:
+
+    int fuse_fill_dir_t(void *buf, const char *name,
+    const struct stat *stbuf, off_t off);
+  */
+  /*
+    // this file system uses the system call *readdir* to get a list of entries and then calls filler to fill in the stuff into the buffer
+    // the buffer is the output of this file readdir call.
+    de = readdir(dp);
+    if (de == 0)
+    return -errno;
+
+    // This will copy the entire directory into the buffer.  The loop exits
+    // when either the system readdir() returns NULL, or filler()
+    // returns something non-zero.  The first case just means I've
+    // read the whole directory; the second means the buffer is full.
+    do {
+    log_msg("calling filler with name %s\n", de->d_name);
+    if (filler(buf, de->d_name, NULL, 0) != 0)
+    return -ENOMEM;
+    } while ((de = readdir(dp)) != NULL);
+  */
+  /*
+    system call readir uses the same error codes as this filessytem call
+
+    EBADF  Invalid file descriptor fd.
+
+    EFAULT Argument points outside the calling process's address space.
+
+    EINVAL Result buffer is too small.
+    ENOENT No such directory.
+
+    ENOTDIR
+    File descriptor does not refer to a directory.
+  */
+
+	fprintf(stderr, "Got into readir\n");
+	fprintf(stderr, "the path is: %s\n", path);
+	filler(buf, ".", NULL, 0, 0);
+	filler(buf, "..", NULL, 0, 0);
+	
+	int retstat = 0;
+	char rand[MAX_INODEID];
 	(void) offset;
 	(void) fi;
 	(void) flags;
+	Blob *root = get_root_inode();
+	// get_inode_from_path(root, path, rand);
 
-	if (strcmp(path, "/") != 0)
-		return -ENOENT;
+	// if (strcmp(rand, "") == 0)  {
+	// /* cant find the root node this is a problem */
+	// 	fprintf(stderr, "NOT FOUND\n");
 
-	filler(buf, ".", NULL, 0, 0);
-	filler(buf, "..", NULL, 0, 0);
-	filler(buf, options.filename, NULL, 0, 0);
+	// 	return -ENOENT;
+	// }
+	// Blob *b = get_blob_from_key(rand);
+	// if (b == NULL) {
+	// 	/* cant find the node that they are looking for in the table of keys and their values */
+	// 	return -ENOENT;
+	// }
+	// if (b ->  is_dir == false) {
+	// 	return -ENOTDIR;
+	// }
 
-	return 0;
+	int i = 0;
+	while (i < root -> num_items) {
+		fprintf(stderr, "calling filler with name %s\n", &root -> sub_items[i] -> item_path[1]);
+		filler(buf, & root -> sub_items[i] -> item_path[1], NULL, 0, 0);
+		i++;
+	}
+	return retstat;
 }
 
 
@@ -170,14 +230,8 @@ static int hello_write(const char *path, const char *buf, size_t size,
 	char found_rand[MAX_INODEID];
 	Blob *root = get_root_inode();
 	get_inode_from_path(root, path, found_rand);
-	fprintf(stderr, "the inode id is %s \n", found_rand);
-	
 	Blob *b = get_blob_from_key(found_rand);
-	fprintf(stderr, "The new blob is %s\n", b -> inodeid);
 	memcpy(b -> data, buf, size);
-	fprintf(stderr, "memcopied the data\n");
-	fprintf(stderr, "data is %s\n", b -> data);
-	fprintf(stderr, "%s\n", b -> data);
 	b->size = size;
 	printTBL();
 	return size;
@@ -215,11 +269,11 @@ static int hello_create(const char *path, mode_t mode, struct fuse_file_info *fi
 
 
 static const struct fuse_operations hello_oper = {
-	.init           = hello_init,
+	.init     = hello_init,
 	.getattr	= hello_getattr,
 	.readdir	= hello_readdir,
-	.open		= hello_open,
-	.read		= hello_read,
+	.open		  = hello_open,
+	.read		  = hello_read,
 	.write		= hello_write,
 	.create 	= hello_create,
 };
