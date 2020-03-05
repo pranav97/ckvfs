@@ -100,7 +100,15 @@ static int hello_getattr(const char *path, struct stat *stbuf,
 
 	return res;
 }
+void get_list(Blob * b, void *buf, fuse_fill_dir_t filler) {
+	int i = 0;
+	while (i < b -> num_items) {
+		fprintf(stderr, "filler with name %s\n", &b -> sub_items[i] -> item_path[1]);
+		filler(buf, & b -> sub_items[i] -> item_path[1], NULL, 0, 0);
+		i++;
+	}
 
+}
 static int hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 			 off_t offset, struct fuse_file_info *fi,
 			 enum fuse_readdir_flags flags)
@@ -153,6 +161,10 @@ static int hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	(void) fi;
 	(void) flags;
 	Blob *root = get_root_inode();
+	if (strcmp(path, "/") == 0) {
+		get_list(root, buf, filler); 
+		return 0;
+	}
 	// get_inode_from_path(root, path, rand);
 
 	// if (strcmp(rand, "") == 0)  {
@@ -170,12 +182,6 @@ static int hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	// 	return -ENOTDIR;
 	// }
 
-	int i = 0;
-	while (i < root -> num_items) {
-		fprintf(stderr, "calling filler with name %s\n", &root -> sub_items[i] -> item_path[1]);
-		filler(buf, & root -> sub_items[i] -> item_path[1], NULL, 0, 0);
-		i++;
-	}
 	return retstat;
 }
 

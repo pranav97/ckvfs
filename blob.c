@@ -51,7 +51,7 @@ void get_inode_from_path(Blob *b, const char *path, char *rand) {
 	// puts the inode id of the blob that the user is looking for
 	for(int i = 0; i < b -> num_items; i++) {
 		if (strcmp(b -> sub_items[i] -> item_path, path) == 0) {
-			fprintf(stderr, "\nrand %s\n", b -> sub_items[i] -> inodeid);
+			fprintf(stderr, "rand %s\n", b -> sub_items[i] -> inodeid);
 			fprintf(stderr, "path is %s\n", b -> sub_items[i] -> item_path);
 			strcpy(rand, b -> sub_items[i] -> inodeid);
 			return;
