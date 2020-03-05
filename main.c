@@ -89,13 +89,13 @@ static int hello_getattr(const char *path, struct stat *stbuf,
 		if (contains == 1) {
 			return -ENOENT;
 		}
-		stbuf->st_mode = S_IFREG | 0444;
-		stbuf->st_nlink = 1;
-
+		
 		Blob *target_blob = tbl[0];
 		get_inode_from_path(target_blob, path, &rand[0]);
 		Blob *b = get_blob_from_key(rand);
 		stbuf->st_size = b -> size;
+		stbuf->st_mode = b -> is_dir ?  (S_IFDIR | 0755) : (S_IFREG | 0444);
+		stbuf->st_nlink = 1;
 	}
 
 	return res;
@@ -274,7 +274,34 @@ static int hello_create(const char *path, mode_t mode, struct fuse_file_info *fi
 	return 0;
 }
 
+static int hello_mkdir(const char *path, mode_t mode)
+{
+	int res = 0;
+	Blob *root = get_root_inode();
+	int contains = has_path(root, path);
+	if (contains == 1) {
+		insert_item_into_blob(root, path, true);
+		fprintf(stderr, "num_items %d\n", root -> num_items);
+		fprintf(stderr, "path is %s\n",root -> sub_items[0] -> item_path);
+		fprintf(stderr, "inode id %s\n", root -> sub_items[0] -> inodeid);
+		fprintf(stderr, "isdir %d\n", root -> sub_items[0] -> is_dir);
+		char inodeid[MAX_INODEID];
+		get_inode_from_path(root, path, inodeid);
+		Blob *new_blob = (Blob *) malloc(sizeof(Blob));
+        new_blob -> num_items = 0;
+        strcpy(new_blob -> inodeid, inodeid);
+        char * new_bl = malloc(MAX_BLOCK * sizeof(char));
+        strcpy(new_bl, "");
+		new_blob -> data = new_bl;
+        new_blob -> size = 0;
+		new_blob -> is_dir = true;
+		tbl[totalBlobs] = new_blob;
+		strcpy(keys[totalBlobs], inodeid);
+        totalBlobs ++;
+	}
 
+	return res;
+}
 
 static const struct fuse_operations hello_oper = {
 	.init     = hello_init,
@@ -284,6 +311,7 @@ static const struct fuse_operations hello_oper = {
 	.read		  = hello_read,
 	.write		= hello_write,
 	.create 	= hello_create,
+	.mkdir 		= hello_mkdir
 };
 
 static void show_help(const char *progname)
