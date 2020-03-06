@@ -75,42 +75,65 @@ static int hello_getattr(const char *path, struct stat *stbuf,
 	(void) fi;
 	int res = 0;
 	char rand[MAX_INODEID];
-	memset(stbuf, 0, sizeof(struct stat));
 
-	if (strcmp(path, "/") == 0) {
+	// fprintf\(stderr, "GET_ATTR\n");
+	char file_name[MAX_NAME], dir_name[MAX_NAME];
+	if (strcmp("/HEAD", path) == 0 || strcmp("/", path) == 0) {
+		Blob *root = get_root_inode();
+		stbuf->st_size = root -> size;
 		stbuf->st_mode = S_IFDIR | 0755;
 		stbuf->st_nlink = 2;
 		return res;
 	}
-	else {
-		Blob *root = get_root_inode();	
-		int contains = has_path(root, path);
-		fprintf(stderr, "contains is %d", contains);
-		if (contains == 1) {
+
+	get_fn_dir(path, dir_name, file_name);
+	fprintf(stderr, "dir_name %s\n", dir_name);
+	fprintf(stderr, "file_name %s\n", file_name);
+	Blob *cur_blob = go_through_inodes(dir_name);
+	if (cur_blob == NULL) {
+		fprintf(stderr, "nulled out cur_blob in go thorugh inodes");
+		return -ENOENT;
+	}
+	// fprintf(stderr, "path was - %s\n", dir_name);
+	// fprintf(stderr, "actual name - %s\n", file_name); 
+	// fprintf(stderr, "cur_blob inode - %s\n", cur_blob -> inodeid); 
+	if (has_path(cur_blob, file_name) == CONTAINS) {
+		if (cur_blob -> is_dir) {
+			get_inode_from_path(cur_blob, file_name, rand);
+			Blob *b = get_blob_from_key(rand);
+			if (b -> is_dir) {
+				stbuf->st_size = b -> size;
+				stbuf->st_mode = S_IFDIR | 0755;
+				stbuf->st_nlink = 2;
+				return res;
+			}
+			else {
+				stbuf->st_size = b -> size;
+				stbuf->st_mode = (S_IFREG | 0444);
+				stbuf->st_nlink = 1;
+				return res;
+			}
+		}
+		else {
 			return -ENOENT;
 		}
-		
-		Blob *target_blob = tbl[0];
-		get_inode_from_path(target_blob, path, &rand[0]);
-		Blob *b = get_blob_from_key(rand);
-		stbuf->st_size = b -> size;
-		stbuf->st_mode = b -> is_dir ?  (S_IFDIR | 0755) : (S_IFREG | 0444);
-		stbuf->st_nlink = 1;
 	}
-
+	else {
+		return -ENOENT;
+	}
 	return res;
 }
 void get_list(Blob * b, void *buf, fuse_fill_dir_t filler) {
 	int i = 0;
 	while (i < b -> num_items) {
-		fprintf(stderr, "filler with name %s\n", &b -> sub_items[i] -> item_path[1]);
-		filler(buf, & b -> sub_items[i] -> item_path[1], NULL, 0, 0);
+		// fprintf(stderr, "filler with name %s\n", &b -> sub_items[i] -> item_path);
+		filler(buf, b -> sub_items[i] -> item_path, NULL, 0, 0);
 		i++;
 	}
 
 }
 static int hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
-			 off_t offset, struct fuse_file_info *fi,
+			 off_t offset, struct fuse_file_info *fi, 	
 			 enum fuse_readdir_flags flags)
 {
   /*
@@ -150,8 +173,6 @@ static int hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     File descriptor does not refer to a directory.
   */
 
-	fprintf(stderr, "Got into readir\n");
-	fprintf(stderr, "the path is: %s\n", path);
 	filler(buf, ".", NULL, 0, 0);
 	filler(buf, "..", NULL, 0, 0);
 	
@@ -160,29 +181,32 @@ static int hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	(void) offset;
 	(void) fi;
 	(void) flags;
-	Blob *root = get_root_inode();
+
+	char file_name[MAX_NAME], dir_name[MAX_NAME];
+
+	
 	if (strcmp(path, "/") == 0) {
+		// // fprintf\(stderr, "\n\n\n\ngetting list for /\n\n\n\n");
+		Blob * root = get_root_inode();
 		get_list(root, buf, filler); 
 		return 0;
 	}
 	else {
-		/* all this doesn't matter till you get makedir to work */   
-		get_inode_from_path(root, path, rand);
-
-		if (strcmp(rand, "") == 0)  {
-		/* cant find the root node this is a problem */
-			fprintf(stderr, "NOT FOUND\n");
-
+		get_fn_dir(path, dir_name, file_name);
+		Blob *cur_blob = go_through_inodes(dir_name);
+		// fprintf(stderr, "cur_blob.inodeid %s", cur_blob -> inodeid);
+		if (cur_blob == NULL) {
+			// fprintf(stderr, "GO THROUGH INODES FAILURE\n");
 			return -ENOENT;
 		}
-		Blob *b = get_blob_from_key(rand);
-		if (b == NULL) {
-			/* cant find the node that they are looking for in the table of keys and their values */
-			return -ENOENT;
-		}
-		if (b ->  is_dir == false) {
+		if (cur_blob -> is_dir == false) {
 			return -ENOTDIR;
 		}
+		get_inode_from_path(cur_blob, file_name, rand);
+		// fprintf(stderr, "rand %s\n", rand);
+		// fprintf(stderr, "file_name %s\n", file_name);
+		cur_blob = get_blob_from_key(rand);
+		get_list(cur_blob, buf, filler); 
 	}
 	return retstat;
 }
@@ -200,12 +224,14 @@ static int hello_read(const char *path, char *buf, size_t size, off_t offset,
 {
 	(void) fi;
 	char rand[MAX_INODEID];
-	Blob *root = get_root_inode();	
-
-	// todo: iterate though the inodes to find the right one 
-	get_inode_from_path(root, path, rand);
-	fprintf(stderr, "rand from read => %s\n", rand);
-
+	// fprintf\(stderr, "GET_ATTR\n");
+	char file_name[MAX_NAME], dir_name[MAX_NAME];
+	get_fn_dir(path, dir_name, file_name);
+	Blob *cur_blob = go_through_inodes(dir_name);
+	if (cur_blob == NULL) {
+		return 0;
+	}
+	get_inode_from_path(cur_blob, file_name, rand);
 	if (strcmp(rand, "") == 0)  {
 		return -ENOENT;
 	}
@@ -213,10 +239,7 @@ static int hello_read(const char *path, char *buf, size_t size, off_t offset,
 	if (b == NULL)  {
 		return -ENOENT;
 	}
-	fprintf(stderr, "file contents read => %s\n", b -> data);
 	memcpy(buf, b -> data, b -> size);
-	fprintf(stderr, "buf => %s\n", buf);
-	fprintf(stderr, "size => %ld\n", b -> size);
 	return b -> size;
 }
 
@@ -227,18 +250,25 @@ static int hello_write(const char *path, const char *buf, size_t size,
 	(void) buf;
 	(void) offset;
 	(void) fi;
-	
-	fprintf(stderr, "write \n");
+	char file_name[MAX_NAME], dir_name[MAX_NAME];
+	char rand[MAX_INODEID];
+
+	// fprintf(stderr, "write \n");
 	char data[MAX_BLOCK] = "";
 	if ((strlen(buf) + strlen(path)) > MAX_BLOCK) {
 		 // todo - find a way to split the data and put it back together. 
 		return 0;
 	}
 	strcat(data, buf);
-	char found_rand[MAX_INODEID];
-	Blob *root = get_root_inode();
-	get_inode_from_path(root, path, found_rand);
-	Blob *b = get_blob_from_key(found_rand);
+	
+	get_fn_dir(path, dir_name, file_name);
+	Blob *cur_blob = go_through_inodes(dir_name);
+	if (cur_blob == NULL) {
+		// fprintf(stderr, "nulled out cur_blob in go thorugh inodes");
+		return -ENOENT;
+	}
+	get_inode_from_path(cur_blob, file_name, rand);
+	Blob *b = get_blob_from_key(rand);
 	memcpy(b -> data, buf, size);
 	b->size = size;
 	printTBL();
@@ -248,58 +278,73 @@ static int hello_write(const char *path, const char *buf, size_t size,
 
 static int hello_create(const char *path, mode_t mode, struct fuse_file_info *fi) {
 	// todo make this go ahead and get all the nodes down the tree
-
-	Blob *root = get_root_inode();
-	int contains = has_path(root, path);
-	if (contains == 1) {
-		insert_item_into_blob(root, path, false);
-		fprintf(stderr, "num_items %d\n", root -> num_items);
-		fprintf(stderr, "path is %s\n",root -> sub_items[0] -> item_path);
-		fprintf(stderr, "inode id %s\n", root -> sub_items[0] -> inodeid);
-		fprintf(stderr, "isdir %d\n", root -> sub_items[0] -> is_dir);
-
-		char inodeid[MAX_INODEID];
-		get_inode_from_path(root, path, inodeid);
-		Blob *new_blob = (Blob *) malloc(sizeof(Blob));
-        new_blob -> num_items = 0;
-        strcpy(new_blob -> inodeid, inodeid);
-        char * new_bl = malloc(MAX_BLOCK * sizeof(char));
-        strcpy(new_bl, "");
-		new_blob -> data = new_bl;
-        new_blob -> size = 0;
-		tbl[totalBlobs] = new_blob;
-		strcpy(keys[totalBlobs], inodeid);
-        totalBlobs ++;
+	fprintf(stderr, "CREATE");
+	int res = 0;
+	char file_name[MAX_NAME], dir_name[MAX_NAME];
+	char inodeid[MAX_INODEID], rand[MAX_INODEID];
+	get_fn_dir(path, dir_name, file_name);
+	fprintf(stderr, "========================================\n");
+	fprintf(stderr, "dir_name is %s\n", dir_name);
+	fprintf(stderr, "file_name is %s\n", file_name);
+	fprintf(stderr, "========================================\n");
+	Blob *cur_blob  = go_through_inodes(dir_name);
+	fprintf(stderr, "line after go_through %s\n", cur_blob -> inodeid);
+	if (cur_blob == NULL) {
+		return 0;
 	}
-	return 0;
+	else if (cur_blob -> is_dir) {
+		fprintf(stderr, "b4 has path %s\n", cur_blob -> inodeid);
+
+		if (has_path(cur_blob, file_name) == NOTCONTAIN) {
+			fprintf(stderr, "the blob that it's being inserted into is %s\n", cur_blob -> inodeid);
+			insert_item_into_blob(cur_blob, file_name, false, inodeid);
+			Blob *new_blob = (Blob *) malloc(sizeof(Blob));
+			new_blob -> num_items = 0;
+			char * new_bl = malloc(MAX_BLOCK * sizeof(char));
+			strcpy(new_bl, ""); 
+			new_blob -> data = new_bl;
+			strcpy(new_blob -> inodeid, inodeid);
+			new_blob -> size = 0;
+			new_blob -> is_dir = false;
+			tbl[totalBlobs] = new_blob;
+			strcpy(keys[totalBlobs], inodeid);
+			totalBlobs ++;
+		}
+	}
+	printTBL();
+	return res;
 }
+	
 
 static int hello_mkdir(const char *path, mode_t mode)
 {
 	int res = 0;
-	Blob *root = get_root_inode();
-	int contains = has_path(root, path);
-	if (contains == 1) {
-		insert_item_into_blob(root, path, true);
-		fprintf(stderr, "num_items %d\n", root -> num_items);
-		fprintf(stderr, "path is %s\n",root -> sub_items[0] -> item_path);
-		fprintf(stderr, "inode id %s\n", root -> sub_items[0] -> inodeid);
-		fprintf(stderr, "isdir %d\n", root -> sub_items[0] -> is_dir);
-		char inodeid[MAX_INODEID];
-		get_inode_from_path(root, path, inodeid);
-		Blob *new_blob = (Blob *) malloc(sizeof(Blob));
-        new_blob -> num_items = 0;
-        strcpy(new_blob -> inodeid, inodeid);
-        char * new_bl = malloc(MAX_BLOCK * sizeof(char));
-        strcpy(new_bl, "");
-		new_blob -> data = new_bl;
-        new_blob -> size = 0;
-		new_blob -> is_dir = true;
-		tbl[totalBlobs] = new_blob;
-		strcpy(keys[totalBlobs], inodeid);
-        totalBlobs ++;
+	char rand[MAX_INODEID];
+	char new_dir_name[MAX_NAME], dir_name[MAX_NAME];
+	char inodeid[MAX_INODEID];
+	
+	get_fn_dir(path, dir_name, new_dir_name);
+	Blob *cur_blob = go_through_inodes(dir_name);
+	if (cur_blob == NULL) {
+		// fprintf(stderr, "nulled out cur_blob in go thorugh inodes");
+		return -ENOTDIR;
 	}
-
+	if (has_path(cur_blob, new_dir_name) == NOTCONTAIN) {
+		if (cur_blob -> is_dir) {
+			insert_item_into_blob(cur_blob, new_dir_name, true, inodeid);
+			Blob *new_blob = (Blob *) malloc(sizeof(Blob));
+			// fprintf(stderr, "created entry with inode id %s", inodeid);
+			strcpy(new_blob -> inodeid, inodeid);
+			new_blob -> num_items = 0;
+			new_blob -> data = NULL;
+			new_blob -> size = 0;
+			new_blob -> is_dir = true;
+			tbl[totalBlobs] = new_blob;
+			strcpy(keys[totalBlobs], inodeid);
+			totalBlobs ++;
+		}
+	}
+	printTBL();
 	return res;
 }
 
