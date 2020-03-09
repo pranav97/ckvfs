@@ -39,7 +39,8 @@ int _env_init();
 
 int perform_insertion(const char *k, const char *value, size_t val_size);
 int perform_read(const char *k, char *buff);
-
+void print_iterator_keyvals(kvs_iterator_list *iter_list, kvs_iterator_option g_iter_mode);
+int perform_iterator();
 
 int _env_exit() {
   int32_t dev_util = 0;
@@ -204,7 +205,7 @@ int perform_read(const char *k, char *buff) {
         fprintf(stderr, "KVAPI: retrieve tuple %s failed with error 0x%x - %s\n", key, ret, kvs_errstr(ret));
         //exit(1);
     } else {
-        fprintf(stderr, "KVAPI: retrieve tuple %s with value = %s, vlen = %d, actual vlen = %d \n", key, value, kvsvalue.length, kvsvalue.actual_value_size);
+        // fprintf(stderr, "KVAPI: retrieve tuple %s with value = %s, vlen = %d, actual vlen = %d \n", key, value, kvsvalue.length, kvsvalue.actual_value_size);
         strcpy(buff, value);
     }
 
@@ -214,9 +215,66 @@ int perform_read(const char *k, char *buff) {
     return SUCCESS;
 }
 
+void print_iterator_keyvals(kvs_iterator_list *iter_list, kvs_iterator_option g_iter_mode){
+  uint8_t *it_buffer = (uint8_t *) iter_list->it_list;
+  uint32_t i;
+
+  if(g_iter_mode.iter_type) {
+    // key and value iterator (KVS_ITERATOR_KEY_VALUE)
+    uint32_t vlen = sizeof(kvs_value_t);
+    uint32_t vlen_value = 0;
+
+    for(i = 0;i < iter_list->num_entries; i++) {
+      fprintf(stdout, "Iterator get %dth key: %s\n", i, it_buffer);
+      it_buffer += 16;
+
+      uint8_t *addr = (uint8_t *)&vlen_value;
+      for (unsigned int i = 0; i < vlen; i++) {
+	*(addr + i) = *(it_buffer + i);
+      }
+
+      it_buffer += vlen;
+      it_buffer += vlen_value;
+      // for ETA50K24 firmware
+      //fprintf(stderr, "error: iterator(KVS_ITERATOR_KEY_VALUE) is not supported.\n");
+    }
+  } else {
+
+    // For fixed key length
+    /*
+    
+    for(i = 0; i < iter_list->num_entries; i++)
+      fprintf(stdout, "Iterator get key %s\n",  it_buffer + i * 16);
+    */
+    
+    // ETA50K24 firmware
+    // key only iterator (KVS_ITERATOR_KEY)
+    uint32_t key_size = 0;
+    char key[256];
+    char value[4096];
+    for(i = 0;i < iter_list->num_entries; i++) {
+       // get key size
+       key_size = *((unsigned int*)it_buffer);
+       it_buffer += sizeof(unsigned int);
+
+       // print key
+       memcpy(key, it_buffer, key_size);
+       key[key_size] = 0;
+
+       perform_read(key, value);
+       fprintf(stdout, "%dth key --> %s\n", i, key);
+       fprintf(stdout, "val ---> %s\n", value);
+
+
+       it_buffer += key_size;
+    }
+      
+  }
+}
+
 int perform_iterator()
 {
-    kvs_iterator_type iter_type=KVS_ITERATOR_KEY;
+  kvs_iterator_type iter_type=KVS_ITERATOR_KEY;
   struct iterator_info *iter_info = (struct iterator_info *)malloc(sizeof(struct iterator_info));
   iter_info->g_iter_mode.iter_type = iter_type;
 
@@ -242,7 +300,7 @@ int perform_iterator()
   
   ret = kvs_open_iterator(shand.cont_handle, &iter_ctx_open, &iter_info->iter_handle);
   if(ret != KVS_SUCCESS) {
-    fprintf(stderr, "KVAPI: iterator open fails with error 0x%x - %s\n", ret, kvs_errstr(ret));
+    fprintf(stderr, "iterator open fails with error 0x%x - %s\n", ret, kvs_errstr(ret));
     free(iter_info);
     return FAILED;
   }
@@ -268,21 +326,20 @@ int perform_iterator()
     memset(iter_info->iter_list.it_list, 0, iter_buff);
     ret = kvs_iterator_next(shand.cont_handle, iter_info->iter_handle, &iter_info->iter_list, &iter_ctx_next);
     if(ret != KVS_SUCCESS) {
-      fprintf(stderr, "KVAPI: iterator next fails with error 0x%x - %s\n", ret, kvs_errstr(ret));
+      fprintf(stderr, "iterator next fails with error 0x%x - %s\n", ret, kvs_errstr(ret));
       free(iter_info);
       kvs_free(buffer);
       return FAILED;
     }
         
     total_entries += iter_info->iter_list.num_entries;
-    fprintf(stderr, "KVAPI: total ent %d\n", total_entries);
-    // print_iterator_keyvals(&iter_info->iter_list, iter_info->g_iter_mode);
+    print_iterator_keyvals(&iter_info->iter_list, iter_info->g_iter_mode);
         
     if(iter_info->iter_list.end) {
-      fprintf(stderr, "KVAPI: Done with all keys. Total: %d\n", total_entries);
+      fprintf(stdout, "Done with all keys. Total: %d\n", total_entries);
       break;
     } else {
-      fprintf(stderr, "KVAPI: More keys available, do another iteration\n");
+      fprintf(stdout, "More keys available, do another iteration\n");
       memset(iter_info->iter_list.it_list, 0,  iter_buff);
     }
   }
@@ -292,7 +349,7 @@ int perform_iterator()
   start = t1.tv_sec * 1000000000L + t1.tv_nsec;
   end = t2.tv_sec * 1000000000L + t2.tv_nsec;
   double sec = (double)(end - start) / 1000000000L;
-  fprintf(stderr, "KVAPI: Total time %.2f sec; Throughput %.2f keys/sec\n", sec, (double)total_entries /sec );
+  fprintf(stdout, "Total time %.2f sec; Throughput %.2f keys/sec\n", sec, (double)total_entries /sec );
 
   /* Close iterator */
   kvs_iterator_context iter_ctx_close;
@@ -301,7 +358,7 @@ int perform_iterator()
 
   ret = kvs_close_iterator(shand.cont_handle, iter_info->iter_handle, &iter_ctx_close);
   if(ret != KVS_SUCCESS) {
-    fprintf(stderr, "KVAPI: Failed to close iterator with error 0x%x - %s\n", ret,
+    fprintf(stderr, "Failed to close iterator with error 0x%x - %s\n", ret,
       kvs_errstr(ret));
     kvs_free(buffer);
     free(iter_info);
@@ -311,6 +368,30 @@ int perform_iterator()
   if(buffer) kvs_free(buffer);
   if(iter_info) free(iter_info);
 
+  return SUCCESS;
+}
+
+int perform_delete(const char *k) {
+  kvs_key_t klen = KLEN;
+  char *key  = (char*)kvs_malloc(klen, 4096);
+  strcpy(key, k);
+
+  if(key == NULL) {
+    fprintf(stderr, "failed to allocate\n");
+    return FAILED;
+  }
+  const kvs_key  kvskey = { key, klen};
+  
+  const kvs_delete_context del_ctx = { {false}, 0, 0};
+  int ret = kvs_delete_tuple(shand.cont_handle, &kvskey, &del_ctx);
+  if(ret != KVS_SUCCESS) {
+    fprintf(stderr, "delete tuple failed with error 0x%x - %s\n", ret, kvs_errstr(ret));
+    kvs_free(key);
+    return FAILED;
+  } else {
+    fprintf(stderr, "delete key %s done \n", key);
+  }
+  if(key) kvs_free(key);
   return SUCCESS;
 }
 
@@ -334,28 +415,55 @@ void set_up_ssd() {
         fprintf(stderr, "KVAPI: not able to initialize\n");
 }
 
-void insert_read_iterate() {
+
+// testing CRUD
+void test_read() {
+  char recvd[VLEN];
+  perform_read("0000Hello", recvd);
+  fprintf(stderr, "KVAPI: received %s\n",recvd);
+}
+
+void test_insert(const char *k, char * v) {
+  char val[4096];
+  strcpy(val, v);
+  perform_insertion(k, val, strlen(val));
+}
+
+void test_iterator() {
+  fprintf(stderr, "KVAPI: reading all keys\n");
+  fprintf(stderr, "KVAPI: ----------------------------\n");
+  perform_iterator();
+  fprintf(stderr, "KVAPI: ----------------------------\n");
+}
+
+void test_delete(const char *k) {
+    perform_delete(k);
+}
+
+void test_api() {
     set_up_ssd();
     char val[4096];
-    strcpy(val, "world");
-    perform_insertion("0000Hello", val, strlen(val));
-    strcpy(val, "world234");
-    perform_insertion("0000hola", val, strlen(val));
-    strcpy(val, "world23433333");
-    perform_insertion("000045dd3", val, strlen(val));
-    char recvd[VLEN];
-    perform_read("0000Hello", recvd);
-
-    fprintf(stderr, "KVAPI: received %s\n",recvd);
-    fprintf(stderr, "KVAPI: reading all keys\n");
-    fprintf(stderr, "KVAPI: ----------------------------\n");
-    perform_iterator();
-    fprintf(stderr, "KVAPI: ----------------------------\n");
-
+    fprintf(stderr, "==================================\n");
+    strcpy(val, "value1");
+    test_insert("00000hello1", val);
+    test_iterator();
+    fprintf(stderr, "==================================\n");
+    strcpy(val, "value2");
+    test_insert("00000hello2", val);
+    test_iterator();
+    fprintf(stderr, "==================================\n");
+    fprintf(stderr, "this is an overwrite of the value\n");
+    strcpy(val, "value3");
+    test_insert("00000hello2", val);
+    test_iterator();
+    fprintf(stderr, "==================================\n");
+    test_delete("00000hello2");
+    test_iterator();
+    fprintf(stderr, "==================================\n");
 }
 
 int main() {
-    insert_read_iterate();
+    test_api();
     return 0;
 }
 
