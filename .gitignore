@@ -1,2 +1,6 @@
 a.out
 main
+test_sync
+test_sync.o
+use_emulator
+use_emulator.o
