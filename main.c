@@ -21,6 +21,7 @@
 
 #define FUSE_USE_VERSION 31
 
+
 #include <fuse.h>
 #include <stdio.h>
 #include <string.h>
@@ -30,9 +31,22 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include <stdbool.h>
+#include <kvs_api.h>
+
+
 #include "blob.h"
 #include "rand.h"
 #include "dict.h"
+
+
+
+#include "blob.c"
+#include "rand.c"
+#include "dict.c"
+
+
 
 
 static struct options {
@@ -55,6 +69,10 @@ static const struct fuse_opt option_spec[] = {
 static void *hello_init(struct fuse_conn_info *conn,
 			struct fuse_config *cfg)
 {
+	kvs_init_options options;
+  	kvs_init_env_opts(&options);
+	kvs_result x = kvs_init_env(&options);
+
 	(void) conn;
 	cfg->kernel_cache = 1;
 	// put in random seed every time that the file system comes up.
