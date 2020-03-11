@@ -18,21 +18,7 @@ void write_to_dict(char *root_inode, Blob *b) {
 	tbl[totalBlobs] = b;
 	totalBlobs++;
 }
-void print_items(Item * items[], int num_items) {
-	for (int i = 0; i < num_items; i++) {
-		fprintf(stderr, "\tPath: %s\n", items[i] -> item_path);
-		fprintf(stderr, "\tinodeid: %s\n", items[i] -> inodeid);
-		fprintf(stderr, "\tis dir %d\n",items[i] -> is_dir);
-	}
-}
 
-void print_blob(Blob *theBlob) {
-	fprintf(stderr, "last 10 digits of blob id %s\n ->", &theBlob -> inodeid[90]);
-	fprintf(stderr, "data: %s\n", theBlob -> data);
-	fprintf(stderr, "Items are\n");
-	print_items(theBlob -> sub_items, theBlob -> num_items);
-	fprintf(stderr, "\n\n");
-}
 void printTBL() {
 	fprintf(stderr, "\nThe tbl is: \n");
 	for(int i = 0; i < totalBlobs; i++) {
