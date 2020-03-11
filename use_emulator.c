@@ -1,6 +1,17 @@
 #include <stdbool.h>
 #include <stdlib.h>
+
 #include <kvs_api.h>
+
+#include "blob.h"
+#include "rand.h"
+#include "dict.h"
+
+
+
+#include "blob.c"
+#include "rand.c"
+#include "dict.c"
 
 
 
@@ -10,7 +21,6 @@
 #define FAILED 1
 #define SUCCESS 0
 #define SMALL_STR 15
-
 
 #define iter_buff (32*1024)
 
@@ -41,6 +51,7 @@ int perform_insertion(const char *k, const char *value, size_t val_size);
 int perform_read(const char *k, char *buff);
 void print_iterator_keyvals(kvs_iterator_list *iter_list, kvs_iterator_option g_iter_mode);
 int perform_iterator();
+static size_t total_malloced = 0;
 
 int _env_exit() {
   int32_t dev_util = 0;
@@ -423,6 +434,7 @@ void test_read() {
   fprintf(stderr, "KVAPI: received %s\n",recvd);
 }
 
+
 void test_insert(const char *k, char * v) {
   char val[4096];
   strcpy(val, v);
@@ -431,9 +443,9 @@ void test_insert(const char *k, char * v) {
 
 void test_iterator() {
   fprintf(stderr, "KVAPI: reading all keys\n");
-  fprintf(stderr, "KVAPI: ----------------------------\n");
+  fprintf(stderr, "----------------------------\n");
   perform_iterator();
-  fprintf(stderr, "KVAPI: ----------------------------\n");
+  fprintf(stderr, "----------------------------\n");
 }
 
 void test_delete(const char *k) {
@@ -462,8 +474,130 @@ void test_api() {
     fprintf(stderr, "==================================\n");
 }
 
+
+WriteBlob *convert_to_write_blob(Blob *b) {
+  WriteBlob *w = malloc(sizeof(WriteBlob));
+  strcpy(w -> inodeid, b -> inodeid);
+  w -> num_items = b -> num_items;
+  if (!b -> is_dir) {
+    memcpy(w -> data, b -> data, strlen(b -> data));
+  }
+  else {
+    memcpy(w -> data, b -> sub_items, (sizeof(Item) * MAX_ITEMS));
+  }
+  w -> is_dir = b -> is_dir;
+  return w;
+}
+
+Blob *convert_to_blob(WriteBlob *b) {
+  // malloc fails sometimes 
+  Blob *translation = (Blob*) malloc(sizeof(Blob));
+  if (translation == NULL) {
+    return NULL;
+  }
+  translation -> is_dir = b -> is_dir;
+  translation -> num_items = b -> num_items;
+  strcpy(translation -> inodeid, b -> inodeid);
+
+  if (b -> is_dir) {
+    memcpy(translation -> sub_items, b -> data, (sizeof(Item) * MAX_ITEMS));
+  }
+  else {
+    char *data = malloc(sizeof(char) * MAX_BLOCK);
+    translation -> data = data;
+    strcpy(translation -> data, b -> data);
+  }
+  return translation;
+
+}
+
+void print_writable_blob(WriteBlob *w) {
+  int l = strlen(w -> inodeid);
+  if (l > 10) {
+    fprintf(stderr, "w -> inodeid: ... %s\n", &w -> inodeid[l - 5]);
+  }
+  else {
+    fprintf(stderr, "w -> inodeid: %s\n", w -> inodeid);
+  }
+  
+  if (w -> is_dir) {
+    fprintf(stderr, "w -> data: not printed because dir\n");
+  }
+  else {
+    int len = strlen(w -> data);
+		if (len > 10) {
+			fprintf(stderr, "w -> data: ... %s\n", &w -> data[len - 10]);
+		}
+		else {
+			fprintf(stderr, "w -> data: %s\n", w -> data);
+		}
+  }
+  
+  fprintf(stderr, "w -> num_items: %lld\n", w -> num_items);
+}
+
+
+void test_write_file() {
+  Blob *root2 = malloc(sizeof(Blob));
+	const char root_inode[MAX_INODEID] = "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002";
+	strcpy(root2 -> inodeid, root_inode);
+	root2 -> is_dir = false;
+  char *d = malloc(sizeof(char) * MAX_BLOCK);
+  strcpy(d, "this is some sample data to write into the file ");
+  root2 -> data = d;
+  root2 -> num_items = 0;
+
+
+  fprintf(stderr, "==========================\n");
+  fprintf(stderr, "reference \n");
+  print_blob(root2);
+  fprintf(stderr, "==========================\n");
+
+  fprintf(stderr, "Converted write blob\n");
+  WriteBlob *to_write = convert_to_write_blob(root2);
+  print_writable_blob(to_write);
+  fprintf(stderr, "==========================\n");
+
+  fprintf(stderr, "Converted back to blob\n");
+  Blob *cpy = convert_to_blob(to_write);
+  print_blob(cpy);
+  fprintf(stderr, "==========================\n");
+
+
+}
+void test_write_dir() {
+  Blob *root2 = malloc(sizeof(Blob));
+	const char root_inode[MAX_INODEID] = "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002";
+	strcpy(root2 -> inodeid, root_inode);
+	root2 -> is_dir = true;
+  strcpy(root2 -> sub_items[0].item_path, "item path");
+  strcpy(root2 -> sub_items[0].inodeid, "0923457890239870598743528743aaaaaaa");
+  root2 -> sub_items[0].is_dir = false;
+  strcpy(root2 -> sub_items[1].item_path, "item path2");
+  strcpy(root2 -> sub_items[1].inodeid, "0923457892222222298743528743aaaaaaa");
+  root2 -> sub_items[1].is_dir = false;
+	root2 -> num_items = 2;
+
+  fprintf(stderr, "==========================\n");
+  fprintf(stderr, "reference \n");
+  print_blob(root2);
+  fprintf(stderr, "==========================\n");
+
+  fprintf(stderr, "Converted write blob\n");
+  WriteBlob *to_write = convert_to_write_blob(root2);
+  print_writable_blob(to_write);
+
+  fprintf(stderr, "Converted back to blob\n");
+  Blob *cpy = convert_to_blob(to_write);
+  print_blob(cpy);
+  
+}
+
+
 int main() {
     test_api();
+    test_write_file();
+    // test_write_dir();
     return 0;
 }
 
