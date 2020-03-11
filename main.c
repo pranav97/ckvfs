@@ -33,7 +33,9 @@
 #include <string.h>
 
 #include <stdbool.h>
+#ifdef USE_DPDK
 #include <kvs_api.h>
+#endif
 
 
 #include "blob.h"
@@ -52,6 +54,7 @@
 static struct options {
 	const char *filename;
 	const char *contents;
+	const int use_dpdk;
 	int show_help;
 } options;
 
@@ -59,6 +62,7 @@ static struct options {
     { t, offsetof(struct options, p), 1 }
 static const struct fuse_opt option_spec[] = {
 	OPTION("--name=%s", filename),
+	OPTION("--use_dpdk", use_dpdk),
 	OPTION("--contents=%s", contents),
 	OPTION("-h", show_help),
 	OPTION("--help", show_help),
@@ -69,10 +73,13 @@ static const struct fuse_opt option_spec[] = {
 static void *hello_init(struct fuse_conn_info *conn,
 			struct fuse_config *cfg)
 {
+	#ifdef USE_DPDK
+	prinf("initializing dpdk stuff now \n");
 	kvs_init_options options;
   	kvs_init_env_opts(&options);
 	kvs_result x = kvs_init_env(&options);
-
+	#endif
+	
 	(void) conn;
 	cfg->kernel_cache = 1;
 	// put in random seed every time that the file system comes up.
@@ -144,8 +151,8 @@ static int hello_getattr(const char *path, struct stat *stbuf,
 void get_list(Blob * b, void *buf, fuse_fill_dir_t filler) {
 	int i = 0;
 	while (i < b -> num_items) {
-		// fprintf(stderr, "filler with name %s\n", &b -> sub_items[i] -> item_path);
-		filler(buf, b -> sub_items[i] -> item_path, NULL, 0, 0);
+		// fprintf(stderr, "filler with name %s\n", &b -> sub_items[i].item_path);
+		filler(buf, b -> sub_items[i].item_path, NULL, 0, 0);
 		i++;
 	}
 
@@ -398,6 +405,7 @@ int main(int argc, char *argv[])
 	   values are specified */
 	options.filename = strdup("hello");
 	options.contents = strdup("Hello World!\n");
+	
 
 	/* Parse options */
 	if (fuse_opt_parse(&args, &options, option_spec, NULL) == -1)
@@ -412,6 +420,9 @@ int main(int argc, char *argv[])
 		show_help(argv[0]);
 		assert(fuse_opt_add_arg(&args, "--help") == 0);
 		args.argv[0][0] = '\0';
+	}
+	if (options.use_dpdk == 1) {
+		#define USE_DPDK 1
 	}
 
 	ret = fuse_main(args.argc, args.argv, &hello_oper, NULL);
