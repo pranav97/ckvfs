@@ -84,7 +84,8 @@ void insert_item_into_blob(Blob *b, const char *name, bool is_dir, char *inodeid
         b -> sub_items[b -> num_items].is_dir = is_dir;
     
         b -> num_items ++;
-
+		WriteBlob *wb = convert_to_write_blob(b);
+		perform_insertion(new_inodeid, (char *) wb);
     }
 }
 

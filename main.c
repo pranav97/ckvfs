@@ -33,9 +33,7 @@
 #include <string.h>
 
 #include <stdbool.h>
-#ifdef USE_DPDK
 #include <kvs_api.h>
-#endif
 
 
 #include "blob.h"
@@ -73,13 +71,13 @@ static const struct fuse_opt option_spec[] = {
 static void *hello_init(struct fuse_conn_info *conn,
 			struct fuse_config *cfg)
 {
-	#ifdef USE_DPDK
-	prinf("initializing dpdk stuff now \n");
+	// not sure what this does
+	fprintf(stderr, "initializing dpdk stuff now \n");
 	kvs_init_options options;
   	kvs_init_env_opts(&options);
 	kvs_result x = kvs_init_env(&options);
-	#endif
 	
+	set_up_ssd();
 	(void) conn;
 	cfg->kernel_cache = 1;
 	// put in random seed every time that the file system comes up.
@@ -331,9 +329,10 @@ static int hello_create(const char *path, mode_t mode, struct fuse_file_info *fi
 			strcpy(new_blob -> inodeid, inodeid);
 			new_blob -> size = 0;
 			new_blob -> is_dir = false;
-			tbl[totalBlobs] = new_blob;
-			strcpy(keys[totalBlobs], inodeid);
-			totalBlobs ++;
+			write_to_dict(inodeid, new_blob);
+			// tbl[totalBlobs] = new_blob;
+			// strcpy(keys[totalBlobs], inodeid);
+			// totalBlobs ++;
 		}
 	}
 	printTBL();
@@ -364,9 +363,7 @@ static int hello_mkdir(const char *path, mode_t mode)
 			new_blob -> data = NULL;
 			new_blob -> size = 0;
 			new_blob -> is_dir = true;
-			tbl[totalBlobs] = new_blob;
-			strcpy(keys[totalBlobs], inodeid);
-			totalBlobs ++;
+			write_to_dict(inodeid, new_blob);
 		}
 	}
 	printTBL();
