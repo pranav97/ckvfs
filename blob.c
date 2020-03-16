@@ -56,9 +56,10 @@ int has_path(Blob *b, const char *path) {
 	// todo - this funciton should be recursive, looking at even the dirs
 	// that are in here as opposed to just the files
     // todo - make this return a blob upon recursion
+	fprintf(stderr, "has path prints\n");
 	for(int i = 0; i < b -> num_items; i++) {
-		// fprintf(stderr, "%s\n", b -> sub_items[i].item_path);
-		// fprintf(stderr, "%s\n", path);
+		fprintf(stderr, "%s\n", b -> sub_items[i].item_path);
+		fprintf(stderr, "%s\n", path);
 		if (strcmp(b -> sub_items[i].item_path, path) == 0) {
       		// contains
 			return CONTAINS;
@@ -68,8 +69,9 @@ int has_path(Blob *b, const char *path) {
 	return NOTCONTAIN;
 }
 
-void insert_item_into_blob(Blob *b, const char *name, bool is_dir, char *inodeid) {
+void insert_item_into_blob(Blob *b, const char *name, int is_dir, char *inodeid) {
     // todo take in information about whether a dir or not 
+	fprintf(stderr, "insert item  %s, %s into %s\n", inodeid, name, b -> inodeid);
     if (has_path(b, name) == CONTAINS) {
         return;
     }
@@ -82,10 +84,8 @@ void insert_item_into_blob(Blob *b, const char *name, bool is_dir, char *inodeid
         strcpy(b -> sub_items[b -> num_items].item_path, name);
         strcpy(b -> sub_items[b -> num_items].inodeid, new_inodeid);
         b -> sub_items[b -> num_items].is_dir = is_dir;
-    
         b -> num_items ++;
-		WriteBlob *wb = convert_to_write_blob(b);
-		perform_insertion(new_inodeid, (char *) wb);
+		write_to_dict(b -> inodeid, b);
     }
 }
 
@@ -146,13 +146,14 @@ void print_items(Item items[], int num_items) {
 
 void print_blob(Blob *theBlob) {
 	int l = strlen(theBlob -> inodeid);
+	fprintf(stderr, "The length of the inodide is %d\n", l);
 	if (l > 10) {
 		fprintf(stderr, "theBlob -> nodeid: ... %s\n", &theBlob -> inodeid[l - 5]);
 	}
 	else {
 		fprintf(stderr, "theBlob -> nodeid: %s\n", theBlob -> inodeid);
 	}	
-	if (theBlob -> is_dir) {
+	if (theBlob -> is_dir == ISDIR) {
 		fprintf(stderr, "theBlob -> subitems is\n");
 		print_items(theBlob -> sub_items, theBlob -> num_items);
 	}
@@ -166,5 +167,8 @@ void print_blob(Blob *theBlob) {
 			fprintf(stderr, "%s\n", theBlob -> data);
 		}
 	}
+	fprintf(stderr, "theBlob -> num_items %d\n", theBlob -> num_items);
+	fprintf(stderr, "theBlob -> size %d\n", theBlob -> size);
 	fprintf(stderr, "\n\n");
 }
+

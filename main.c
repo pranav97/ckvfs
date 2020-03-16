@@ -47,6 +47,7 @@
 #include "dict.c"
 
 
+struct ssd_handle shand;
 
 
 static struct options {
@@ -67,34 +68,31 @@ static const struct fuse_opt option_spec[] = {
 	FUSE_OPT_END
 };
 
-
 static void *hello_init(struct fuse_conn_info *conn,
 			struct fuse_config *cfg)
 {
+	memset((void *) &shand, 0, sizeof(shand));
 	// not sure what this does
-	fprintf(stderr, "initializing dpdk stuff now \n");
-	kvs_init_options options;
-  	kvs_init_env_opts(&options);
-	kvs_result x = kvs_init_env(&options);
+	// fprintf(stderr, "initializing dpdk stuff now \n");
+	// kvs_init_options options;
+  	// kvs_init_env_opts(&options);
+	// kvs_result x = kvs_init_env(&options);
 	
-	set_up_ssd();
+	set_up_ssd(); 
 	(void) conn;
 	cfg->kernel_cache = 1;
 	// put in random seed every time that the file system comes up.
 	set_time_srand_seed(); 
-
-	Blob *root = malloc(sizeof(Blob));
-	const char root_inode[MAX_INODEID] = "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002";
-	strcpy(root -> inodeid, root_inode);
-	root -> is_dir = true;
-	root -> num_items = 0;
-	write_to_dict(root -> inodeid, root);
+	write_root();
+	Blob *b = get_root_inode();
+	print_blob(b);
 	return NULL;
 }
 
-static int hello_getattr(const char *path, struct stat *stbuf,
+static int hello_getattr_wrapper(const char *path, struct stat *stbuf,
 			 struct fuse_file_info *fi)
 {
+	fprintf(stderr, "inside getattr xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n");
 	(void) fi;
 	int res = 0;
 	char rand[MAX_INODEID];
@@ -117,35 +115,55 @@ static int hello_getattr(const char *path, struct stat *stbuf,
 		fprintf(stderr, "nulled out cur_blob in go thorugh inodes");
 		return -ENOENT;
 	}
-	// fprintf(stderr, "path was - %s\n", dir_name);
-	// fprintf(stderr, "actual name - %s\n", file_name); 
-	// fprintf(stderr, "cur_blob inode - %s\n", cur_blob -> inodeid); 
+	fprintf(stderr, "path was - %s\n", dir_name);
+	fprintf(stderr, "actual name - %s\n", file_name); 
+	fprintf(stderr, "cur_blob inode - %s\n", cur_blob -> inodeid); 
+	
 	if (has_path(cur_blob, file_name) == CONTAINS) {
-		if (cur_blob -> is_dir) {
+		fprintf(stderr, "has path returns %d\n", CONTAINS);
+		if (cur_blob -> is_dir == ISDIR) {
 			get_inode_from_path(cur_blob, file_name, rand);
+			fprintf(stderr, "Tje random number to look for is %s\n", rand);
 			Blob *b = get_blob_from_key(rand);
-			if (b -> is_dir) {
+			if (b -> is_dir == ISDIR) {
 				stbuf->st_size = b -> size;
 				stbuf->st_mode = S_IFDIR | 0755;
 				stbuf->st_nlink = 2;
+				fprintf(stderr, "outisde getattr xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx DIRRRRRR \n");
 				return res;
 			}
 			else {
 				stbuf->st_size = b -> size;
 				stbuf->st_mode = (S_IFREG | 0444);
 				stbuf->st_nlink = 1;
+				fprintf(stderr, "outisde getattr xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx NOT DIRRRRR\n");
 				return res;
 			}
 		}
 		else {
+			fprintf(stderr, "has path returns %d\n", NOTCONTAIN);
+			fprintf(stderr, "outisde getattr xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n");
 			return -ENOENT;
 		}
 	}
 	else {
+		fprintf(stderr, "outisde getattr xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n");
 		return -ENOENT;
 	}
+	fprintf(stderr, "outisde getattr xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n");
 	return res;
 }
+
+static int hello_getattr(const char *path, struct stat *stbuf,
+			 struct fuse_file_info *fi)
+{
+	int ret_val = hello_getattr_wrapper(path, stbuf, fi);
+	fprintf(stderr, "returning %d\n", ret_val);
+	fprintf(stderr, "size that it returns was %d\n", stbuf -> st_size);
+	return ret_val;
+
+}
+
 void get_list(Blob * b, void *buf, fuse_fill_dir_t filler) {
 	int i = 0;
 	while (i < b -> num_items) {
@@ -195,6 +213,7 @@ static int hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     ENOTDIR
     File descriptor does not refer to a directory.
   */
+ 	fprintf(stderr, "xxxxxxxxxxxxxxxxxx inside of read xxxxxxxxxxx\n");
 
 	filler(buf, ".", NULL, 0, 0);
 	filler(buf, "..", NULL, 0, 0);
@@ -222,7 +241,7 @@ static int hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 			// fprintf(stderr, "GO THROUGH INODES FAILURE\n");
 			return -ENOENT;
 		}
-		if (cur_blob -> is_dir == false) {
+		if (cur_blob -> is_dir == NOTDIR) {
 			return -ENOTDIR;
 		}
 		get_inode_from_path(cur_blob, file_name, rand);
@@ -263,6 +282,7 @@ static int hello_read(const char *path, char *buf, size_t size, off_t offset,
 		return -ENOENT;
 	}
 	memcpy(buf, b -> data, b -> size);
+	fprintf(stderr, "return from read -> b -> size %d \n", b -> size);
 	return b -> size;
 }
 
@@ -295,6 +315,7 @@ static int hello_write(const char *path, const char *buf, size_t size,
 	memcpy(b -> data, buf, size);
 	b->size = size;
 	printTBL();
+	write_to_dict(b -> inodeid, b);
 	return size;
 }
 
@@ -311,16 +332,14 @@ static int hello_create(const char *path, mode_t mode, struct fuse_file_info *fi
 	fprintf(stderr, "file_name is %s\n", file_name);
 	fprintf(stderr, "========================================\n");
 	Blob *cur_blob  = go_through_inodes(dir_name);
-	fprintf(stderr, "line after go_through %s\n", cur_blob -> inodeid);
 	if (cur_blob == NULL) {
 		return 0;
 	}
 	else if (cur_blob -> is_dir) {
-		fprintf(stderr, "b4 has path %s\n", cur_blob -> inodeid);
-
 		if (has_path(cur_blob, file_name) == NOTCONTAIN) {
 			fprintf(stderr, "the blob that it's being inserted into is %s\n", cur_blob -> inodeid);
 			insert_item_into_blob(cur_blob, file_name, false, inodeid);
+			print_blob(cur_blob);
 			Blob *new_blob = (Blob *) malloc(sizeof(Blob));
 			new_blob -> num_items = 0;
 			char * new_bl = malloc(MAX_BLOCK * sizeof(char));
@@ -328,8 +347,8 @@ static int hello_create(const char *path, mode_t mode, struct fuse_file_info *fi
 			new_blob -> data = new_bl;
 			strcpy(new_blob -> inodeid, inodeid);
 			new_blob -> size = 0;
-			new_blob -> is_dir = false;
-			write_to_dict(inodeid, new_blob);
+			new_blob -> is_dir = NOTDIR;
+			write_to_dict(new_blob -> inodeid, new_blob);
 			// tbl[totalBlobs] = new_blob;
 			// strcpy(keys[totalBlobs], inodeid);
 			// totalBlobs ++;
@@ -354,7 +373,7 @@ static int hello_mkdir(const char *path, mode_t mode)
 		return -ENOTDIR;
 	}
 	if (has_path(cur_blob, new_dir_name) == NOTCONTAIN) {
-		if (cur_blob -> is_dir) {
+		if (cur_blob -> is_dir == ISDIR) {
 			insert_item_into_blob(cur_blob, new_dir_name, true, inodeid);
 			Blob *new_blob = (Blob *) malloc(sizeof(Blob));
 			// fprintf(stderr, "created entry with inode id %s", inodeid);
@@ -362,7 +381,7 @@ static int hello_mkdir(const char *path, mode_t mode)
 			new_blob -> num_items = 0;
 			new_blob -> data = NULL;
 			new_blob -> size = 0;
-			new_blob -> is_dir = true;
+			new_blob -> is_dir = ISDIR;
 			write_to_dict(inodeid, new_blob);
 		}
 	}

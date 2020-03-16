@@ -1,12 +1,9 @@
 #include "dict.h"
 
-#define FAILED 1
-#define SUCCESS 0
-#define SMALL_STR 15
 
 #define iter_buff (32*1024)
-
 extern struct ssd_handle shand;
+
 
 void set_up_ssd() {
     char *conf = malloc(sizeof(char) * SMALL_STR);
@@ -14,7 +11,7 @@ void set_up_ssd() {
     char *cont_name = malloc(sizeof(char) * SMALL_STR);
 
     kvs_init_env_opts(&shand.options);
-    strcpy(conf, "../kvssd_emul.conf");
+    strcpy(conf, "/src/my_stuff/kvssd_emul.conf");
     strcpy(dev_path, "/dev/kvemul");
     strcpy(cont_name, "test");
     shand.cont_name = cont_name;
@@ -123,7 +120,7 @@ int perform_insertion(const char *k, const char *val) {
     char *key   = (char*)kvs_malloc(klen, 4096);
     char *value = (char*)kvs_malloc(val_size, 4096);
     strcpy(key, k);
-    strcpy(value, val);
+    memcpy(value, val, val_size);
     if(key == NULL || value == NULL) {
         fprintf(stderr, "KVAPI: failed to allocate\n");
         return FAILED;
@@ -173,7 +170,6 @@ int perform_read(const char *k, char *buff) {
     const kvs_retrieve_context ret_ctx = {option, 0, 0};
     const kvs_key  kvskey = {key, klen };
     kvs_value kvsvalue = { value, val_size , 0, 0 /*offset */};
-    fprintf("The container handle is %s", shand.cont_handle);
     ret = kvs_retrieve_tuple(shand.cont_handle, &kvskey, &kvsvalue, &ret_ctx);
     if(ret != KVS_SUCCESS) {
         fprintf(stderr, "KVAPI: retrieve tuple %s failed with error 0x%x - %s\n", key, ret, kvs_errstr(ret));
@@ -181,7 +177,7 @@ int perform_read(const char *k, char *buff) {
         //exit(1);
     } else {
         // fprintf(stderr, "KVAPI: retrieve tuple %s with value = %s, vlen = %d, actual vlen = %d \n", key, value, kvsvalue.length, kvsvalue.actual_value_size);
-        strcpy(buff, value);
+        memcpy(buff, value, sizeof(WriteBlob));
     }
 
     if(key) kvs_free(key);
@@ -375,15 +371,27 @@ int perform_delete(const char *k) {
 
 WriteBlob *convert_to_write_blob(Blob *b) {
   WriteBlob *w = malloc(sizeof(WriteBlob));
+  w -> is_dir = b -> is_dir;
+  w -> size = b -> size;
   strcpy(w -> inodeid, b -> inodeid);
   w -> num_items = b -> num_items;
-  if (!b -> is_dir) {
-    memcpy(w -> data, b -> data, strlen(b -> data));
+  if (b -> is_dir == NOTDIR) {
+    fprintf(stderr, " isdir NOT set \n");
+    memcpy(w -> data, b -> data, b -> size);
   }
   else {
-    memcpy(w -> data, b -> sub_items, (sizeof(Item) * MAX_ITEMS));
+    fprintf(stderr, " isdir set \n");
+    if (sizeof(Item) * MAX_ITEMS > MAX_BLOCK) {
+      fprintf(stderr, "corruuption \n");
+      exit(1);
+    }
+    memcpy(w -> data, b -> sub_items, sizeof(Item) * MAX_ITEMS);
+    fprintf(stderr, "w -> inodeid %s\n", w -> inodeid);
+    for (int i = 0; i < 10; i ++  ) {
+      fprintf(stderr, "%d ", w->data[i]);
+    }
+    fprintf(stderr, "\n");
   }
-  w -> is_dir = b -> is_dir;
   return w;
 }
 
@@ -393,17 +401,19 @@ Blob *convert_to_blob(WriteBlob *b) {
   if (translation == NULL) {
     return NULL;
   }
+  translation -> size = b -> size;
   translation -> is_dir = b -> is_dir;
   translation -> num_items = b -> num_items;
   strcpy(translation -> inodeid, b -> inodeid);
 
-  if (b -> is_dir) {
+  if (b -> is_dir == ISDIR) {
+    fprintf(stderr, " isdir set \n");
     memcpy(translation -> sub_items, b -> data, (sizeof(Item) * MAX_ITEMS));
   }
   else {
-    char *data = malloc(sizeof(char) * MAX_BLOCK);
-    translation -> data = data;
-    strcpy(translation -> data, b -> data);
+    translation -> data = malloc(sizeof(char) * MAX_BLOCK);
+    fprintf(stderr, "b -> size is %d\n", b -> size);
+    memcpy(translation -> data, b -> data, b -> size);
   }
   return translation;
 
@@ -418,11 +428,11 @@ void print_writable_blob(WriteBlob *w) {
     fprintf(stderr, "w -> inodeid: %s\n", w -> inodeid);
   }
   
-  if (w -> is_dir) {
+  if (w -> is_dir == ISDIR) {
     fprintf(stderr, "w -> data: not printed because dir\n");
   }
   else {
-    int len = strlen(w -> data);
+    int len = w -> size;
 		if (len > 10) {
 			fprintf(stderr, "w -> data: ... %s\n", &w -> data[len - 10]);
 		}
@@ -461,10 +471,12 @@ Blob *get_blob_from_key(char *key) {
 }
 
 void write_to_dict(char *root_inode, Blob *b) {
-  fprintf(stderr, "fuckfuckfuck %d", b -> num_items);
+  print_blob(b);
   WriteBlob *wb = convert_to_write_blob(b);
   char *cwb = (char *) wb;
+  fprintf(stderr,"the value of is dir is %d\n", wb -> is_dir);
   perform_insertion(root_inode, cwb);
+  
 }
 
 void printTBL() {
@@ -473,9 +485,24 @@ void printTBL() {
 
 Blob *get_root_inode() {
 	const char root_inode[MAX_INODEID] = "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002";
-  char recvd[MAX_BLOCK];
-  perform_read(root_inode, recvd);
-  Blob *b =  convert_to_blob((WriteBlob *) recvd);
+  WriteBlob recvd;
+  perform_read(root_inode, (char *) &recvd);
+  fprintf(stderr, "\n");
+
+  Blob *b =  convert_to_blob(&recvd);
   return b;
+
+}
+
+void write_root() {
+	Blob *root = malloc(sizeof(Blob));
+  memset(root, 0, sizeof(Blob));
+	const char root_inode[MAX_INODEID] = "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002\0";
+	strcpy(root -> inodeid, root_inode);
+	root -> is_dir = ISDIR;
+	root -> num_items = 0;
+	write_to_dict(root -> inodeid, root);
+	free(root->data);
+	free(root);
 
 }

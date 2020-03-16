@@ -25,18 +25,28 @@
 
 #define CONTAINS 0
 
+
+#define FAILED 1
+#define SUCCESS 0
+#define SMALL_STR 15
+
+#define ISDIR 100
+#define NOTDIR 50
+
+
 #define NOTCONTAIN  1
 typedef struct item {
 	char item_path[MAX_PATH];
 	char inodeid[MAX_INODEID];
-	bool is_dir;
+	int is_dir;
 } Item;
 
 typedef struct write_blob {
-	char inodeid[MAX_INODEID];
-	char data[MAX_BLOCK];
+	int is_dir; 
 	int num_items;
-	bool is_dir;
+	size_t size;
+	char inodeid[MAX_INODEID];
+	unsigned char data[MAX_BLOCK];
 } WriteBlob; // this struct will just have the raw bytes of either sub_items or data
 
 typedef struct blob {
@@ -45,14 +55,14 @@ typedef struct blob {
 	char *data;
 	size_t size;
 	int num_items;
-	bool is_dir;
+	int is_dir;
 } Blob;
 
 extern void print_paths(Blob *b);
 	
 extern int has_path(Blob *b, const char *path);
 
-extern void insert_item_into_blob(Blob *b, const char *name, bool is_dir, char *inodeid);
+extern void insert_item_into_blob(Blob *b, const char *name, int is_dir, char *inodeid);
 
 extern void get_inode_from_path(Blob *b, const char *path, char *rand);
 

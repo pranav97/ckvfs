@@ -36,6 +36,8 @@ struct iterator_info{
 
 void set_up_ssd();
 int _env_init();
+extern void write_root();
+extern Blob *get_root_inode();
 int perform_insertion(const char *k, const char *val);
 int perform_read(const char *k, char *buff);
 void print_iterator_keyvals(kvs_iterator_list *iter_list, kvs_iterator_option g_iter_mode);
@@ -45,5 +47,6 @@ WriteBlob *convert_to_write_blob(Blob *b);
 Blob *convert_to_blob(WriteBlob *b);
 void print_writable_blob(WriteBlob *w);
 int _env_exit();
+
 
 #endif
