@@ -5,19 +5,18 @@
 
 Blob* go_through_inodes(const char *path) {
 	Blob *cur_blob = get_root_inode();
-  	fprintf(stderr, "==================================\n");
 	char rest[MAX_PATH], rand[MAX_INODEID];
 	char *rest_ptr, *token;
 	const char sep[2] = "/";
     rest_ptr = strdup(path);
 	token = strtok(rest_ptr, sep);	
    	while( token != NULL ) {
-		fprintf( stderr, "next item %s\n", token );
+		// fprintf( stderr, "next item %s\n", token );
 		if (has_path(cur_blob, token) == CONTAINS) {
 			get_inode_from_path(cur_blob, token, rand);
-			fprintf(stderr, "the inode number in go through - %s\n", rand);
+			// fprintf(stderr, "the inode number in go through - %s\n", rand);
 			cur_blob = get_blob_from_key(rand);
-			fprintf(stderr, "blob in go through - %s\n", cur_blob -> inodeid);
+			// fprintf(stderr, "blob in go through - %s\n", cur_blob -> inodeid);
 		}
 		else {
 			cur_blob = NULL;
@@ -25,8 +24,6 @@ Blob* go_through_inodes(const char *path) {
 		}
       	token = strtok(NULL, sep);
    	}
-
-	fprintf(stderr, "==================================\n");
 	return cur_blob;
 }
 
@@ -46,20 +43,15 @@ void get_fn_dir(const char *path, char*dir, char*fn) {
 }
 
 
-void print_paths(Blob *b) {
-    fprintf(stderr, "\nThe paths are: \n");
-    for(int i = 0; i < b -> num_items; i++)
-        fprintf(stderr, "path %s\n", b -> sub_items[i].item_path);
-}
 
 int has_path(Blob *b, const char *path) {
 	// todo - this funciton should be recursive, looking at even the dirs
 	// that are in here as opposed to just the files
     // todo - make this return a blob upon recursion
-	fprintf(stderr, "has path prints\n");
+	// fprintf(stderr, "has path prints\n");
 	for(int i = 0; i < b -> num_items; i++) {
-		fprintf(stderr, "%s\n", b -> sub_items[i].item_path);
-		fprintf(stderr, "%s\n", path);
+		// fprintf(stderr, "%s\n", b -> sub_items[i].item_path);
+		// fprintf(stderr, "%s\n", path);
 		if (strcmp(b -> sub_items[i].item_path, path) == 0) {
       		// contains
 			return CONTAINS;
@@ -71,7 +63,6 @@ int has_path(Blob *b, const char *path) {
 
 void insert_item_into_blob(Blob *b, const char *name, int is_dir, char *inodeid) {
     // todo take in information about whether a dir or not 
-	fprintf(stderr, "insert item  %s, %s into %s\n", inodeid, name, b -> inodeid);
     if (has_path(b, name) == CONTAINS) {
         return;
     }
@@ -118,8 +109,6 @@ void get_first_name(char *path, char * first_name) {
 void walk_subitems(Blob *b, const char *path, char *rand) {
     for(int i = 0; i < b -> num_items; i++) {
 		if (strcmp(b -> sub_items[i].item_path, path) == 0) {
-			// fprintf(stderr, "rand %s\n", b -> sub_items[i].inodeid);
-			// fprintf(stderr, "path is %s\n", b -> sub_items[i].item_path);
 			strcpy(rand, b -> sub_items[i].inodeid);
 			return;
 		}
@@ -130,9 +119,6 @@ void walk_subitems(Blob *b, const char *path, char *rand) {
 
 
 void get_inode_from_path(Blob *b, const char *path, char *rand) {
-    // fprintf(stderr, "IN THE GET INODE FROM PATH FUN\n");
-    // fprintf(stderr, "the blob is -> %s\n", &b -> inodeid[90]);
-    // fprintf(stderr, "path is -> %s\n", path);
 	walk_subitems(b, path, rand);
 }
 
@@ -144,15 +130,18 @@ void print_items(Item items[], int num_items) {
 	}
 }
 
-void print_blob(Blob *theBlob) {
+void print_inode_id(Blob *theBlob) {
 	int l = strlen(theBlob -> inodeid);
-	fprintf(stderr, "The length of the inodide is %d\n", l);
 	if (l > 10) {
 		fprintf(stderr, "theBlob -> nodeid: ... %s\n", &theBlob -> inodeid[l - 5]);
 	}
 	else {
 		fprintf(stderr, "theBlob -> nodeid: %s\n", theBlob -> inodeid);
 	}	
+}
+
+void print_blob(Blob *theBlob) {
+	print_inode_id(theBlob);
 	if (theBlob -> is_dir == ISDIR) {
 		fprintf(stderr, "theBlob -> subitems is\n");
 		print_items(theBlob -> sub_items, theBlob -> num_items);
@@ -172,3 +161,8 @@ void print_blob(Blob *theBlob) {
 	fprintf(stderr, "\n\n");
 }
 
+void print_paths(Blob *b) {
+    fprintf(stderr, "\nThe paths are: \n");
+    for(int i = 0; i < b -> num_items; i++)
+        fprintf(stderr, "path %s\n", b -> sub_items[i].item_path);
+}

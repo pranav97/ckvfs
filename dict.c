@@ -131,8 +131,8 @@ int perform_insertion(const char *k, const char *val) {
     const kvs_store_context put_ctx = { option, 0, 0 };
     const kvs_key kvskey = { key, klen };
     const kvs_value kvsvalue = { value, val_size, 0, 0};
-
-    fprintf(stderr, "KVAPI: Inserted kv pair: { %s : %s }\n", key, value);
+    // print is broken here because it's not a char, it's unsigned char 
+    // fprintf(stderr, "KVAPI: Inserted kv pair: { %s : %s }\n", key, value);
     int ret = kvs_store_tuple(shand.cont_handle, &kvskey, &kvsvalue, &put_ctx);    
     if(ret != KVS_SUCCESS ) {
         fprintf(stderr, "KVAPI: store tuple failed with error 0x%x - %s\n", ret, kvs_errstr(ret));
@@ -376,21 +376,15 @@ WriteBlob *convert_to_write_blob(Blob *b) {
   strcpy(w -> inodeid, b -> inodeid);
   w -> num_items = b -> num_items;
   if (b -> is_dir == NOTDIR) {
-    fprintf(stderr, " isdir NOT set \n");
     memcpy(w -> data, b -> data, b -> size);
   }
   else {
-    fprintf(stderr, " isdir set \n");
     if (sizeof(Item) * MAX_ITEMS > MAX_BLOCK) {
       fprintf(stderr, "corruuption \n");
+      // todo, is there a way to make this exit go away?
       exit(1);
     }
     memcpy(w -> data, b -> sub_items, sizeof(Item) * MAX_ITEMS);
-    fprintf(stderr, "w -> inodeid %s\n", w -> inodeid);
-    for (int i = 0; i < 10; i ++  ) {
-      fprintf(stderr, "%d ", w->data[i]);
-    }
-    fprintf(stderr, "\n");
   }
   return w;
 }
@@ -407,12 +401,10 @@ Blob *convert_to_blob(WriteBlob *b) {
   strcpy(translation -> inodeid, b -> inodeid);
 
   if (b -> is_dir == ISDIR) {
-    fprintf(stderr, " isdir set \n");
     memcpy(translation -> sub_items, b -> data, (sizeof(Item) * MAX_ITEMS));
   }
   else {
     translation -> data = malloc(sizeof(char) * MAX_BLOCK);
-    fprintf(stderr, "b -> size is %d\n", b -> size);
     memcpy(translation -> data, b -> data, b -> size);
   }
   return translation;
@@ -471,24 +463,20 @@ Blob *get_blob_from_key(char *key) {
 }
 
 void write_to_dict(char *root_inode, Blob *b) {
-  print_blob(b);
+  // print_blob(b);
   WriteBlob *wb = convert_to_write_blob(b);
   char *cwb = (char *) wb;
-  fprintf(stderr,"the value of is dir is %d\n", wb -> is_dir);
   perform_insertion(root_inode, cwb);
   
 }
 
 void printTBL() {
-  fprintf(stderr, "Not implmemented");
+  fprintf(stderr, "Not implmemented\n");
 }
 
 Blob *get_root_inode() {
-	const char root_inode[MAX_INODEID] = "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002";
   WriteBlob recvd;
-  perform_read(root_inode, (char *) &recvd);
-  fprintf(stderr, "\n");
-
+  perform_read(root_id, (char *) &recvd);
   Blob *b =  convert_to_blob(&recvd);
   return b;
 
@@ -497,8 +485,7 @@ Blob *get_root_inode() {
 void write_root() {
 	Blob *root = malloc(sizeof(Blob));
   memset(root, 0, sizeof(Blob));
-	const char root_inode[MAX_INODEID] = "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002\0";
-	strcpy(root -> inodeid, root_inode);
+	strcpy(root -> inodeid, root_id);
 	root -> is_dir = ISDIR;
 	root -> num_items = 0;
 	write_to_dict(root -> inodeid, root);

@@ -72,32 +72,24 @@ static void *hello_init(struct fuse_conn_info *conn,
 			struct fuse_config *cfg)
 {
 	memset((void *) &shand, 0, sizeof(shand));
-	// not sure what this does
-	// fprintf(stderr, "initializing dpdk stuff now \n");
-	// kvs_init_options options;
-  	// kvs_init_env_opts(&options);
-	// kvs_result x = kvs_init_env(&options);
-	
 	set_up_ssd(); 
 	(void) conn;
 	cfg->kernel_cache = 1;
+	
 	// put in random seed every time that the file system comes up.
 	set_time_srand_seed(); 
 	write_root();
 	Blob *b = get_root_inode();
-	print_blob(b);
+	// print_blob(b);
 	return NULL;
 }
 
-static int hello_getattr_wrapper(const char *path, struct stat *stbuf,
+static int hello_getattr_wrapped(const char *path, struct stat *stbuf,
 			 struct fuse_file_info *fi)
 {
-	fprintf(stderr, "inside getattr xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n");
 	(void) fi;
 	int res = 0;
 	char rand[MAX_INODEID];
-
-	// fprintf\(stderr, "GET_ATTR\n");
 	char file_name[MAX_NAME], dir_name[MAX_NAME];
 	if (strcmp("/HEAD", path) == 0 || strcmp("/", path) == 0) {
 		Blob *root = get_root_inode();
@@ -108,58 +100,48 @@ static int hello_getattr_wrapper(const char *path, struct stat *stbuf,
 	}
 
 	get_fn_dir(path, dir_name, file_name);
-	fprintf(stderr, "dir_name %s\n", dir_name);
-	fprintf(stderr, "file_name %s\n", file_name);
+	// fprintf(stderr, "dir_name %s\n", dir_name);
+	// fprintf(stderr, "file_name %s\n", file_name);
 	Blob *cur_blob = go_through_inodes(dir_name);
 	if (cur_blob == NULL) {
 		fprintf(stderr, "nulled out cur_blob in go thorugh inodes");
 		return -ENOENT;
 	}
-	fprintf(stderr, "path was - %s\n", dir_name);
-	fprintf(stderr, "actual name - %s\n", file_name); 
-	fprintf(stderr, "cur_blob inode - %s\n", cur_blob -> inodeid); 
+	// fprintf(stderr, "path was - %s\n", dir_name);
+	// fprintf(stderr, "actual name - %s\n", file_name); 
+	// fprintf(stderr, "cur_blob inode - %s\n", cur_blob -> inodeid); 
 	
 	if (has_path(cur_blob, file_name) == CONTAINS) {
-		fprintf(stderr, "has path returns %d\n", CONTAINS);
 		if (cur_blob -> is_dir == ISDIR) {
 			get_inode_from_path(cur_blob, file_name, rand);
-			fprintf(stderr, "Tje random number to look for is %s\n", rand);
 			Blob *b = get_blob_from_key(rand);
 			if (b -> is_dir == ISDIR) {
 				stbuf->st_size = b -> size;
 				stbuf->st_mode = S_IFDIR | 0755;
 				stbuf->st_nlink = 2;
-				fprintf(stderr, "outisde getattr xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx DIRRRRRR \n");
-				return res;
 			}
 			else {
 				stbuf->st_size = b -> size;
 				stbuf->st_mode = (S_IFREG | 0444);
 				stbuf->st_nlink = 1;
-				fprintf(stderr, "outisde getattr xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx NOT DIRRRRR\n");
-				return res;
 			}
 		}
 		else {
-			fprintf(stderr, "has path returns %d\n", NOTCONTAIN);
-			fprintf(stderr, "outisde getattr xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n");
-			return -ENOENT;
+			res = -ENOENT;
 		}
 	}
 	else {
-		fprintf(stderr, "outisde getattr xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n");
-		return -ENOENT;
+		res = -ENOENT;
 	}
-	fprintf(stderr, "outisde getattr xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n");
 	return res;
 }
 
 static int hello_getattr(const char *path, struct stat *stbuf,
 			 struct fuse_file_info *fi)
 {
-	int ret_val = hello_getattr_wrapper(path, stbuf, fi);
-	fprintf(stderr, "returning %d\n", ret_val);
-	fprintf(stderr, "size that it returns was %d\n", stbuf -> st_size);
+	int ret_val = hello_getattr_wrapped(path, stbuf, fi);
+	// fprintf(stderr, "returning %d\n", ret_val);
+	// fprintf(stderr, "size that it returns was %d\n", stbuf -> st_size);
 	return ret_val;
 
 }
@@ -177,30 +159,28 @@ static int hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 			 off_t offset, struct fuse_file_info *fi, 	
 			 enum fuse_readdir_flags flags)
 {
-  /*
+  	/*
     filler()'s prototype looks like this:
 
     int fuse_fill_dir_t(void *buf, const char *name,
     const struct stat *stbuf, off_t off);
-  */
-  /*
-    // this file system uses the system call *readdir* to get a list of entries and then calls filler to fill in the stuff into the buffer
-    // the buffer is the output of this file readdir call.
+  
+  
+    this file system uses the system call *readdir* to get a list of entries and then calls filler to fill in the stuff into the buffer
+    the buffer is the output of this file readdir call.
     de = readdir(dp);
     if (de == 0)
     return -errno;
 
-    // This will copy the entire directory into the buffer.  The loop exits
-    // when either the system readdir() returns NULL, or filler()
-    // returns something non-zero.  The first case just means I've
-    // read the whole directory; the second means the buffer is full.
+    This will copy the entire directory into the buffer.  The loop exits
+    when either the system readdir() returns NULL, or filler()
+    returns something non-zero.  The first case just means I've
+    read the whole directory; the second means the buffer is full.
     do {
     log_msg("calling filler with name %s\n", de->d_name);
     if (filler(buf, de->d_name, NULL, 0) != 0)
     return -ENOMEM;
     } while ((de = readdir(dp)) != NULL);
-  */
-  /*
     system call readir uses the same error codes as this filessytem call
 
     EBADF  Invalid file descriptor fd.
@@ -212,9 +192,7 @@ static int hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
     ENOTDIR
     File descriptor does not refer to a directory.
-  */
- 	fprintf(stderr, "xxxxxxxxxxxxxxxxxx inside of read xxxxxxxxxxx\n");
-
+	*/
 	filler(buf, ".", NULL, 0, 0);
 	filler(buf, "..", NULL, 0, 0);
 	
@@ -228,7 +206,6 @@ static int hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 	
 	if (strcmp(path, "/") == 0) {
-		// // fprintf\(stderr, "\n\n\n\ngetting list for /\n\n\n\n");
 		Blob * root = get_root_inode();
 		get_list(root, buf, filler); 
 		return 0;
@@ -236,17 +213,13 @@ static int hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	else {
 		get_fn_dir(path, dir_name, file_name);
 		Blob *cur_blob = go_through_inodes(dir_name);
-		// fprintf(stderr, "cur_blob.inodeid %s", cur_blob -> inodeid);
 		if (cur_blob == NULL) {
-			// fprintf(stderr, "GO THROUGH INODES FAILURE\n");
 			return -ENOENT;
 		}
 		if (cur_blob -> is_dir == NOTDIR) {
 			return -ENOTDIR;
 		}
 		get_inode_from_path(cur_blob, file_name, rand);
-		// fprintf(stderr, "rand %s\n", rand);
-		// fprintf(stderr, "file_name %s\n", file_name);
 		cur_blob = get_blob_from_key(rand);
 		get_list(cur_blob, buf, filler); 
 	}
@@ -266,7 +239,6 @@ static int hello_read(const char *path, char *buf, size_t size, off_t offset,
 {
 	(void) fi;
 	char rand[MAX_INODEID];
-	// fprintf\(stderr, "GET_ATTR\n");
 	char file_name[MAX_NAME], dir_name[MAX_NAME];
 	get_fn_dir(path, dir_name, file_name);
 	Blob *cur_blob = go_through_inodes(dir_name);
@@ -282,7 +254,6 @@ static int hello_read(const char *path, char *buf, size_t size, off_t offset,
 		return -ENOENT;
 	}
 	memcpy(buf, b -> data, b -> size);
-	fprintf(stderr, "return from read -> b -> size %d \n", b -> size);
 	return b -> size;
 }
 
@@ -296,7 +267,6 @@ static int hello_write(const char *path, const char *buf, size_t size,
 	char file_name[MAX_NAME], dir_name[MAX_NAME];
 	char rand[MAX_INODEID];
 
-	// fprintf(stderr, "write \n");
 	char data[MAX_BLOCK] = "";
 	if ((strlen(buf) + strlen(path)) > MAX_BLOCK) {
 		 // todo - find a way to split the data and put it back together. 
@@ -307,7 +277,7 @@ static int hello_write(const char *path, const char *buf, size_t size,
 	get_fn_dir(path, dir_name, file_name);
 	Blob *cur_blob = go_through_inodes(dir_name);
 	if (cur_blob == NULL) {
-		// fprintf(stderr, "nulled out cur_blob in go thorugh inodes");
+		fprintf(stderr, "nulled out cur_blob in go thorugh inodes");
 		return -ENOENT;
 	}
 	get_inode_from_path(cur_blob, file_name, rand);
@@ -322,24 +292,18 @@ static int hello_write(const char *path, const char *buf, size_t size,
 
 static int hello_create(const char *path, mode_t mode, struct fuse_file_info *fi) {
 	// todo make this go ahead and get all the nodes down the tree
-	fprintf(stderr, "CREATE");
 	int res = 0;
 	char file_name[MAX_NAME], dir_name[MAX_NAME];
 	char inodeid[MAX_INODEID], rand[MAX_INODEID];
 	get_fn_dir(path, dir_name, file_name);
-	fprintf(stderr, "========================================\n");
-	fprintf(stderr, "dir_name is %s\n", dir_name);
-	fprintf(stderr, "file_name is %s\n", file_name);
-	fprintf(stderr, "========================================\n");
 	Blob *cur_blob  = go_through_inodes(dir_name);
 	if (cur_blob == NULL) {
 		return 0;
 	}
 	else if (cur_blob -> is_dir) {
 		if (has_path(cur_blob, file_name) == NOTCONTAIN) {
-			fprintf(stderr, "the blob that it's being inserted into is %s\n", cur_blob -> inodeid);
 			insert_item_into_blob(cur_blob, file_name, false, inodeid);
-			print_blob(cur_blob);
+			// print_blob(cur_blob);
 			Blob *new_blob = (Blob *) malloc(sizeof(Blob));
 			new_blob -> num_items = 0;
 			char * new_bl = malloc(MAX_BLOCK * sizeof(char));
@@ -349,9 +313,6 @@ static int hello_create(const char *path, mode_t mode, struct fuse_file_info *fi
 			new_blob -> size = 0;
 			new_blob -> is_dir = NOTDIR;
 			write_to_dict(new_blob -> inodeid, new_blob);
-			// tbl[totalBlobs] = new_blob;
-			// strcpy(keys[totalBlobs], inodeid);
-			// totalBlobs ++;
 		}
 	}
 	printTBL();
@@ -361,6 +322,10 @@ static int hello_create(const char *path, mode_t mode, struct fuse_file_info *fi
 
 static int hello_mkdir(const char *path, mode_t mode)
 {
+	// todo potentially have to refactor mkdir and create to be similar. 
+	// The only difference is 
+	// 1) the insert iterm into blob arguments 
+	// 2) new blob types
 	int res = 0;
 	char rand[MAX_INODEID];
 	char new_dir_name[MAX_NAME], dir_name[MAX_NAME];
@@ -369,7 +334,7 @@ static int hello_mkdir(const char *path, mode_t mode)
 	get_fn_dir(path, dir_name, new_dir_name);
 	Blob *cur_blob = go_through_inodes(dir_name);
 	if (cur_blob == NULL) {
-		// fprintf(stderr, "nulled out cur_blob in go thorugh inodes");
+		fprintf(stderr, "nulled out cur_blob in go thorugh inodes");
 		return -ENOTDIR;
 	}
 	if (has_path(cur_blob, new_dir_name) == NOTCONTAIN) {
@@ -377,6 +342,7 @@ static int hello_mkdir(const char *path, mode_t mode)
 			insert_item_into_blob(cur_blob, new_dir_name, true, inodeid);
 			Blob *new_blob = (Blob *) malloc(sizeof(Blob));
 			// fprintf(stderr, "created entry with inode id %s", inodeid);
+			
 			strcpy(new_blob -> inodeid, inodeid);
 			new_blob -> num_items = 0;
 			new_blob -> data = NULL;
@@ -389,6 +355,12 @@ static int hello_mkdir(const char *path, mode_t mode)
 	return res;
 }
 
+ int hello_unlink(const char *path) {
+	int res = 0;
+	fprintf(stderr, "Path to be removed is: %s\n", path);
+	return res;
+ }
+
 static const struct fuse_operations hello_oper = {
 	.init     = hello_init,
 	.getattr	= hello_getattr,
@@ -397,7 +369,8 @@ static const struct fuse_operations hello_oper = {
 	.read		  = hello_read,
 	.write		= hello_write,
 	.create 	= hello_create,
-	.mkdir 		= hello_mkdir
+	.mkdir 		= hello_mkdir,
+	.unlink 	= hello_unlink
 };
 
 static void show_help(const char *progname)
