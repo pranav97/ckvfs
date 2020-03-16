@@ -18,10 +18,10 @@ extern Blob *get_blob_from_key(char *key);
 struct ssd_handle {
     kvs_container_handle cont_handle;
     kvs_init_options options;
-    char *configfile;
-    char *dev_path;
+    char configfile[SMALL_STR];
+    char dev_path[SMALL_STR];
     kvs_device_handle dev;
-    char *cont_name;
+    char cont_name[SMALL_STR];
 };
 
 

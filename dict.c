@@ -6,17 +6,10 @@ extern struct ssd_handle shand;
 
 
 void set_up_ssd() {
-    char *conf = malloc(sizeof(char) * SMALL_STR);
-    char *dev_path = malloc(sizeof(char) * SMALL_STR);
-    char *cont_name = malloc(sizeof(char) * SMALL_STR);
-
     kvs_init_env_opts(&shand.options);
-    strcpy(conf, "/src/my_stuff/kvssd_emul.conf");
-    strcpy(dev_path, "/dev/kvemul");
-    strcpy(cont_name, "test");
-    shand.cont_name = cont_name;
-    shand.dev_path = dev_path;
-    shand.configfile = conf;   
+    strcpy(shand.cont_name, "test");
+    strcpy(shand.dev_path, "/dev/kvemul");
+    strcpy(shand.configfile,  "/src/my_stuff/kvssd_emul.conf");
     shand.options.memory.use_dpdk = 0;
     shand.options.emul_config_file = shand.configfile;
 
