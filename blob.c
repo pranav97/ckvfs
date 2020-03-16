@@ -122,6 +122,21 @@ void get_inode_from_path(Blob *b, const char *path, char *rand) {
 	walk_subitems(b, path, rand);
 }
 
+void remove_inode_from_path(Blob *cur_blob,const char* file_name) {
+	int i;
+	int j;
+	for(i = 0; i < cur_blob -> num_items; i++) {
+		if (strcmp(cur_blob -> sub_items[i].item_path, file_name) == 0) {
+			break;
+		}
+	}
+	for (j = i + 1; j < cur_blob -> num_items; i++, j++) {
+		memcpy(&cur_blob -> sub_items[i], &cur_blob -> sub_items[j], sizeof(Item));
+	}
+	cur_blob -> num_items -= 1;
+}
+
+
 void print_items(Item items[], int num_items) {
 	for (int i = 0; i < num_items; i++) {
 		fprintf(stderr, "\tPath: %s\n", items[i].item_path);

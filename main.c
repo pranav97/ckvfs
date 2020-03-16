@@ -79,8 +79,6 @@ static void *hello_init(struct fuse_conn_info *conn,
 	// put in random seed every time that the file system comes up.
 	set_time_srand_seed(); 
 	write_root();
-	Blob *b = get_root_inode();
-	// print_blob(b);
 	return NULL;
 }
 
@@ -358,6 +356,20 @@ static int hello_mkdir(const char *path, mode_t mode)
  int hello_unlink(const char *path) {
 	int res = 0;
 	fprintf(stderr, "Path to be removed is: %s\n", path);
+	char rand[MAX_INODEID];
+	char file_name[MAX_NAME], dir_name[MAX_NAME];
+	get_fn_dir(path, dir_name, file_name);
+	Blob *cur_blob = go_through_inodes(dir_name);
+	if (cur_blob == NULL) {
+		return res;
+	}
+	get_inode_from_path(cur_blob, file_name, rand);
+	if (strcmp(rand, "") == 0)  {
+		return res;
+	}
+	perform_delete(rand);
+	remove_inode_from_path(cur_blob, file_name);
+	write_to_dict(cur_blob -> inodeid, cur_blob);
 	return res;
  }
 
