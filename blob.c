@@ -63,17 +63,16 @@ int has_path(Blob *b, const char *path) {
 
 void insert_item_into_blob(Blob *b, const char *name, int is_dir, char *inodeid) {
     // todo take in information about whether a dir or not 
+	char new_inode_id[MAX_INODEID];
     if (has_path(b, name) == CONTAINS) {
         return;
     }
     else {
-        char *new_inodeid;
-        new_inodeid = (char *) malloc(MAX_INODEID * sizeof(char));
-        get_random_num(new_inodeid);
-        strcpy(inodeid, new_inodeid);
+        get_random_num(new_inode_id);
+        strcpy(inodeid, new_inode_id);
         
         strcpy(b -> sub_items[b -> num_items].item_path, name);
-        strcpy(b -> sub_items[b -> num_items].inodeid, new_inodeid);
+        strcpy(b -> sub_items[b -> num_items].inodeid, new_inode_id);
         b -> sub_items[b -> num_items].is_dir = is_dir;
         b -> num_items ++;
 		write_to_dict(b -> inodeid, b);
