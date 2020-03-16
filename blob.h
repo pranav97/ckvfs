@@ -73,5 +73,6 @@ extern Blob* go_through_inodes(const char *path);
 extern void get_fn_dir(const char *path, char*dir, char*fn);
 
 extern void remove_inode_from_path(Blob *cur_blob,const char* file_name);
+
 #endif
 

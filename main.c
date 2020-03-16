@@ -373,6 +373,26 @@ static int hello_mkdir(const char *path, mode_t mode)
 	return res;
  }
 
+int hello_rmdir(const char *path) {
+	int res = 0;
+	fprintf(stderr, "Path to be removed is: %s\n", path);
+	char rand[MAX_INODEID];
+	char file_name[MAX_NAME], dir_name[MAX_NAME];
+	get_fn_dir(path, dir_name, file_name);
+	Blob *cur_blob = go_through_inodes(dir_name);
+	if (cur_blob == NULL) {
+		return res;
+	}
+	get_inode_from_path(cur_blob, file_name, rand);
+	if (strcmp(rand, "") == 0)  {
+		return res;
+	}
+	perform_delete(rand);
+	remove_inode_from_path(cur_blob, file_name);
+	write_to_dict(cur_blob -> inodeid, cur_blob);
+	return res;
+ }
+
 static const struct fuse_operations hello_oper = {
 	.init     = hello_init,
 	.getattr	= hello_getattr,
@@ -382,7 +402,8 @@ static const struct fuse_operations hello_oper = {
 	.write		= hello_write,
 	.create 	= hello_create,
 	.mkdir 		= hello_mkdir,
-	.unlink 	= hello_unlink
+	.unlink 	= hello_unlink,
+	.rmdir		= hello_rmdir
 };
 
 static void show_help(const char *progname)
