@@ -15,9 +15,8 @@
 
 #define MAX_INODEID 100
 
-#define MAX_BLOCK 10000
+#define MAX_BLOCK 4096
 
-#define MAX_ITEMS 40
 
 #define MISSING_FILE 1
 
@@ -36,10 +35,13 @@
 
 #define NOTCONTAIN  1
 typedef struct item {
-	char item_path[MAX_PATH];
-	char inodeid[MAX_INODEID];
-	int is_dir;
+	char item_path[MAX_PATH]; // 100
+	char inodeid[MAX_INODEID]; // 100
+	int is_dir; // 4 bytes
 } Item;
+
+#define MAX_ITEMS (MAX_BLOCK / sizeof(Item))
+
 
 typedef struct write_blob {
 	int is_dir; 

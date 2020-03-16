@@ -180,9 +180,9 @@ void test_root() {
 
 int main() {
     test_api();
-    // test_write_file();
-    // test_write_dir();
-    // test_insert_item_into();
+    test_write_file();
+    test_write_dir();
+    test_insert_item_into();
   	
     test_root();
     return 0;
