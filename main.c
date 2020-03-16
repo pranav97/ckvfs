@@ -374,7 +374,7 @@ static int hello_mkdir(const char *path, mode_t mode)
  }
 
 int hello_rmdir(const char *path) {
-	hello_unlink(path);
+	return hello_unlink(path);
  }
 
 static const struct fuse_operations hello_oper = {

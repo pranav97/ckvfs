@@ -368,7 +368,7 @@ int perform_delete(const char *k) {
 }
 
 
-
+// this is for write
 WriteBlob *convert_to_write_blob(Blob *b) {
   WriteBlob *w = malloc(sizeof(WriteBlob));
   w -> is_dir = b -> is_dir;
@@ -384,11 +384,12 @@ WriteBlob *convert_to_write_blob(Blob *b) {
       // todo, is there a way to make this exit go away?
       exit(1);
     }
-    memcpy(w -> data, b -> sub_items, sizeof(Item) * MAX_ITEMS);
+    memcpy(w -> data, b -> sub_items, sizeof(Item) * b -> num_items);
   }
   return w;
 }
 
+// this is for read
 Blob *convert_to_blob(WriteBlob *b) {
   // malloc fails sometimes 
   Blob *translation = (Blob*) malloc(sizeof(Blob));
@@ -401,7 +402,7 @@ Blob *convert_to_blob(WriteBlob *b) {
   strcpy(translation -> inodeid, b -> inodeid);
 
   if (b -> is_dir == ISDIR) {
-    memcpy(translation -> sub_items, b -> data, (sizeof(Item) * MAX_ITEMS));
+    memcpy(translation -> sub_items, b -> data, (sizeof(Item) * b -> num_items));
   }
   else {
     translation -> data = malloc(sizeof(char) * MAX_BLOCK);
