@@ -15,10 +15,12 @@ Blob* go_through_inodes(const char *path) {
 		if (has_path(cur_blob, token) == CONTAINS) {
 			get_inode_from_path(cur_blob, token, rand);
 			// fprintf(stderr, "the inode number in go through - %s\n", rand);
+			free(cur_blob);
 			cur_blob = get_blob_from_key(rand);
 			// fprintf(stderr, "blob in go through - %s\n", cur_blob -> inodeid);
 		}
 		else {
+			free(cur_blob);
 			cur_blob = NULL;
 			break;
 		}

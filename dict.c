@@ -461,6 +461,7 @@ void write_to_dict(char *root_inode, Blob *b) {
   WriteBlob *wb = convert_to_write_blob(b);
   char *cwb = (char *) wb;
   perform_insertion(root_inode, cwb);
+  free(wb);
   
 }
 

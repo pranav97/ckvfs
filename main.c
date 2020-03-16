@@ -314,6 +314,7 @@ static int hello_create(const char *path, mode_t mode, struct fuse_file_info *fi
 		}
 	}
 	printTBL();
+	free(cur_blob);
 	return res;
 }
 	
