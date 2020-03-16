@@ -42,20 +42,19 @@ typedef struct item {
 } Item;
 
 typedef struct write_blob {
-	int is_dir;  // common
-	int num_items; // dir
-	size_t size; // file
-	char inodeid[MAX_INODEID]; // common
-	// this data will just have the raw bytes of either sub_items or data
-	unsigned char data[MAX_BLOCK]; // common
-} WriteBlob; 
+	int is_dir; 
+	int num_items;
+	size_t size;
+	char inodeid[MAX_INODEID];
+	unsigned char data[MAX_BLOCK];
+} WriteBlob; // this struct will just have the raw bytes of either sub_items or data
 
 typedef struct blob {
-	Item sub_items [MAX_ITEMS]; // dir
+	Item sub_items [MAX_ITEMS];
 	char inodeid[MAX_INODEID];
-	char *data; // file
+	char *data;
 	size_t size;
-	int num_items; 
+	int num_items;
 	int is_dir;
 } Blob;
 
