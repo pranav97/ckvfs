@@ -18,23 +18,23 @@ There is a paper that goes along this this that explains all the design decision
 
 ```bash build_emul.bash```
 
-3. Export the path to the shared library object so that main can see it 
+4. Export the path to the shared library object so that main can see it 
 
 ```export LD_LIBRARY_PATH="/src/KVSSD/PDK/core/build"```
 
-3. Build
+5. Build
 
 ```make clean; make```
 
-4. Make a directory that will be the mount point of this fs
+6. Make a directory that will be the mount point of this fs
 
 ```mkdir /tmp/mountpt```
 
-5. A absolute path of the *configuration file* is a required command line argument for this script. Please paste that after --conf. 
+7. A absolute path of the *configuration file* is a required command line argument for this script. Please paste that after --conf. 
 
 ```./main -d -s -o auto_unmount /tmp/mountpt --config=/src/my_stuff/my-kvfs/kvssd_emul.conf``` 
 
-6. In another terminal you can run the tests that are in this repo 
+8. In another terminal you can run the tests that are in this repo 
 
 ```cp create*.bash /tmp/```
 
