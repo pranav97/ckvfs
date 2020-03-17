@@ -8,9 +8,15 @@ There is a paper that goes along this this that explains all the design decision
 
 ```git clone https://github.com/OpenMPDK/KVSSD ../KVSSD```
 
-2. Move build_emul.bash to the right location in the KVSSD project.
+2. Copy build_emul.bash to the right location in the KVSSD project.
 
 ```cp build_emul.bash ../KVSSD/PDK/core/``` 
+
+3. Run the build_emul.bash script
+
+```cd ../KVSSD/PDK/core/```
+
+```bash build_emul.bash```
 
 3. Export the path to the shared library object so that main can see it 
 
