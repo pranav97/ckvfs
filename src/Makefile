@@ -15,4 +15,4 @@ test_sync: test_sync.o
 	$(CXX) -g test_sync.o $(LDFLAGS) -lkvapi  -o test_sync
 
 clean: 
-	rm -f main main.o test_sync test_sync.o use_emulator.o notkvmain main use_emulator
+	rm -f main main.o test_sync test_sync.o use_emulator.o main use_emulator

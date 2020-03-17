@@ -46,23 +46,20 @@
 #include "rand.c"
 #include "dict.c"
 
+static const char default_config[] = "/src/my_stuff/my-kvfs/kvssd_emul.conf";
 
 struct ssd_handle shand;
 
 
 static struct options {
-	const char *filename;
-	const char *contents;
-	const int use_dpdk;
+	const char *config_file;
 	int show_help;
 } options;
 
 #define OPTION(t, p)                           \
     { t, offsetof(struct options, p), 1 }
 static const struct fuse_opt option_spec[] = {
-	OPTION("--name=%s", filename),
-	OPTION("--use_dpdk", use_dpdk),
-	OPTION("--contents=%s", contents),
+	OPTION("--config=%s", config_file),
 	OPTION("-h", show_help),
 	OPTION("--help", show_help),
 	FUSE_OPT_END
@@ -72,7 +69,7 @@ static void *hello_init(struct fuse_conn_info *conn,
 			struct fuse_config *cfg)
 {
 	memset((void *) &shand, 0, sizeof(shand));
-	set_up_ssd(); 
+	set_up_ssd(options.config_file); 
 	(void) conn;
 	cfg->kernel_cache = 1;
 	
@@ -395,11 +392,9 @@ static void show_help(const char *progname)
 {
 	printf("usage: %s [options] <mountpoint>\n\n", progname);
 	printf("File-system specific options:\n"
-	       "    --name=<s>          Name of the \"hello\" file\n"
-	       "                        (default: \"hello\")\n"
-	       "    --contents=<s>      Contents \"hello\" file\n"
-	       "                        (default \"Hello, World!\\n\")\n"
-	       "\n");
+	       "    --config=<s>      Configuration file for the samsung api\n"
+		"                         default %s\n"
+	       "\n", default_config);
 }
 
 int main(int argc, char *argv[])
@@ -410,8 +405,7 @@ int main(int argc, char *argv[])
 	/* Set defaults -- we have to use strdup so that
 	   fuse_opt_parse can free the defaults if other
 	   values are specified */
-	options.filename = strdup("hello");
-	options.contents = strdup("Hello World!\n");
+	options.config_file = strdup(default_config);
 	
 
 	/* Parse options */
@@ -428,10 +422,9 @@ int main(int argc, char *argv[])
 		assert(fuse_opt_add_arg(&args, "--help") == 0);
 		args.argv[0][0] = '\0';
 	}
-	if (options.use_dpdk == 1) {
-		#define USE_DPDK 1
+	if (options.config_file, default_config) {
+		fprintf(stderr, "WARN: using default configuration, please use kvssd_emul.conf or something similar to access the samsung api ssd \n");
 	}
-
 	ret = fuse_main(args.argc, args.argv, &hello_oper, NULL);
 	fuse_opt_free_args(&args);
 	return ret;

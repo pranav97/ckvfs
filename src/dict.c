@@ -5,16 +5,19 @@
 extern struct ssd_handle shand;
 
 
-void set_up_ssd() {
+void set_up_ssd(const char *config_file) {
     kvs_init_env_opts(&shand.options);
     strcpy(shand.cont_name, "test");
     strcpy(shand.dev_path, "/dev/kvemul");
-    strcpy(shand.configfile,  "/src/my_stuff/kvssd_emul.conf");
+    strcpy(shand.configfile,  config_file);
     shand.options.memory.use_dpdk = 0;
     shand.options.emul_config_file = shand.configfile;
 
-    if(_env_init() != SUCCESS)
+    if(_env_init() != SUCCESS) {
         fprintf(stderr, "KVAPI: not able to initialize\n");
+        exit(1);
+    }
+        
     
 }
 
@@ -27,7 +30,6 @@ int _env_init() {
     fprintf(stderr, "KVAPI: Device open failed\n");
     return FAILED;
   }
-  fprintf(stderr, "******Successfully did what ever\n");
 
   //container list before create "test"
   uint32_t valid_cnt = 0;
