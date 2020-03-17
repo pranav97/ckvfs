@@ -30,6 +30,10 @@ There is a paper that goes along this this that explains all the design decision
 
 6. In another terminal you can run the tests that are in this repo 
 
+```cp create*.bash /tmp/```
+
+```cd /tmp/```
+
 ```bash create_dirs.bash```
 
 ```bash create_files.bash```
