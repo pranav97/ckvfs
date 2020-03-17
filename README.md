@@ -14,7 +14,7 @@ There is a paper that goes along this this that explains all the design decision
 ```make clean; make```
 4. Make a directory that will be the mount point of this fs
 ```mkdir /tmp/mountpt```
-5. A absolute path of the *configuration file* is a required command line argument for this script. Please paste that in the \-\-conf=<s> argument. 
+5. A absolute path of the *configuration file* is a required command line argument for this script. Please paste that after --conf. 
 ```./main -d -s -o auto_unmount /tmp/mountpt --config=/src/my_stuff/my-kvfs/kvssd_emul.conf``` 
 6. In another terminal you can run the tests that are in this repo 
 ```bash create_dirs.bash
