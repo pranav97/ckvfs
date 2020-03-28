@@ -1,5 +1,4 @@
 # ckvfs
-This repo is for the C implementation of the python kvfs - https://github.com/qznc/kvfs
 
 There is a paper that goes along this this that explains all the design decisions while building this prototype. 
 
